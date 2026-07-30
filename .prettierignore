@@ -1,0 +1,7 @@
+node_modules
+out
+dist
+build
+.npm-cache
+docs/design-reference.html
+tech.md

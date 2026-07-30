@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Uplink — дизайн-код</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Schibsted+Grotesk:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   UPLINK DESIGN CODE
+   Hairline as the single structural primitive.
+   No shadows. No gradients.
+
+   Radius has exactly two values and nothing in between:
+   structure is 0, controls are 999px. The reference cuts its
+   grid with a blade and rounds every control into a full pill
+   (see the quantity stepper and the Buy button on the product
+   page). That tension is the reference's actual signature, so
+   keep it rather than flattening everything to 0.
+   ============================================================ */
+
+:root{
+  /* palette — cool neutral, monochrome, one oxide for failure only */
+  --paper:#EFEFEE;
+  --well:#F6F6F5;
+  --ink:#161614;
+  --muted:#8E8E89;
+  --rule:#DCDCD8;
+  --oxide:#8C4A38;
+
+  /* type */
+  --serif:"Instrument Serif",Didot,"Times New Roman",serif;
+  --sans:"Schibsted Grotesk","Helvetica Neue",Inter,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+
+  /* scale */
+  --t-display:34px;
+  --t-title:21px;
+  --t-body:14px;
+  --t-small:13px;
+  --t-caption:10px;
+
+  /* spacing — 8px base, generous multiples */
+  --s1:8px; --s2:16px; --s3:24px; --s4:40px; --s5:64px; --s6:96px;
+
+  /* radius — two values only, никаких промежуточных */
+  --r-structure:0;
+  --r-control:999px;
+
+  /* fill for the single primary action; softer than ink on purpose */
+  --graphite:#3A3A37;
+
+  /* motion */
+  --dur:220ms;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--sans);font-size:var(--t-body);line-height:1.5;
+  font-weight:400;
+}
+:focus-visible{outline:1px solid var(--ink);outline-offset:3px}
+::selection{background:var(--ink);color:var(--paper)}
+
+/* ---------- shared type utilities ---------- */
+.eyebrow{
+  font-size:var(--t-caption);text-transform:uppercase;letter-spacing:.14em;
+  color:var(--muted);font-weight:400;
+}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.dim{color:var(--muted)}
+
+/* ============================================================
+   MASTHEAD
+   ============================================================ */
+.masthead{
+  display:flex;align-items:baseline;justify-content:space-between;
+  padding:var(--s4) var(--s4) var(--s3);
+  border-bottom:1px solid var(--rule);
+  flex-wrap:wrap;gap:var(--s2);
+}
+.wordmark{
+  font-family:var(--serif);font-size:26px;letter-spacing:.02em;
+  text-transform:uppercase;line-height:1;
+}
+.masthead-meta{display:flex;gap:var(--s4);align-items:baseline}
+
+/* ============================================================
+   SECTION SHELL
+   ============================================================ */
+.band{border-bottom:1px solid var(--rule);padding:var(--s5) var(--s4)}
+.band-head{
+  display:flex;gap:var(--s3);align-items:baseline;
+  margin-bottom:var(--s4);
+}
+.band-num{
+  font-family:var(--mono);font-size:var(--t-caption);color:var(--muted);
+  letter-spacing:.1em;padding-top:6px;
+}
+.band-title{font-size:var(--t-title);font-weight:400;margin:0;letter-spacing:-.01em}
+.band-note{max-width:62ch;color:var(--muted);font-size:var(--t-small);margin:6px 0 0}
+
+/* ============================================================
+   01 PALETTE
+   ============================================================ */
+.swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));border-top:1px solid var(--rule)}
+.swatch{border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:0}
+.swatch:last-child{border-right:none}
+.swatch-chip{height:104px;border-bottom:1px solid var(--rule)}
+.swatch-body{padding:var(--s2)}
+.swatch-name{font-size:var(--t-small);display:block}
+.swatch-hex{font-family:var(--mono);font-size:11px;color:var(--muted);display:block;margin-top:2px}
+.swatch-use{font-size:11px;color:var(--muted);display:block;margin-top:var(--s1);line-height:1.4}
+
+/* ============================================================
+   02 TYPE SPECIMENS
+   ============================================================ */
+.spec{border-top:1px solid var(--rule)}
+.spec-row{
+  display:grid;grid-template-columns:180px 1fr;gap:var(--s3);
+  padding:var(--s3) 0;border-bottom:1px solid var(--rule);align-items:baseline;
+}
+.spec-meta{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6}
+.sample-display{font-size:var(--t-display);line-height:1.1;letter-spacing:-.02em}
+.sample-wordmark{font-family:var(--serif);font-size:40px;text-transform:uppercase;letter-spacing:.02em;line-height:1}
+.sample-title{font-size:var(--t-title)}
+.sample-body{font-size:var(--t-body)}
+.sample-mono{font-family:var(--mono);font-size:var(--t-small)}
+
+/* ============================================================
+   03 HAIRLINE GRID
+   ============================================================ */
+.grid-demo{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  border-top:1px solid var(--rule);border-left:1px solid var(--rule);
+}
+.cell{
+  border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  aspect-ratio:1;padding:var(--s2);position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+.cell-plus{position:absolute;top:var(--s2);right:var(--s2);color:var(--muted);font-size:15px;line-height:1}
+.cell-label{font-size:11px;color:var(--muted);text-align:center}
+.cell--filled{background:var(--ink)}
+.cell--photo{
+  background:
+    linear-gradient(170deg,#C9CDCB 0%,#B4BAB6 44%,#8E9791 74%,#6E7972 100%);
+}
+
+/* ============================================================
+   04 PROGRESS — the signature
+   ============================================================ */
+.progress{width:100%}
+.progress-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+  margin-bottom:var(--s2);gap:var(--s2);
+}
+.progress-stage{font-size:var(--t-caption);text-transform:uppercase;letter-spacing:.14em}
+.progress-pct{font-family:var(--mono);font-size:var(--t-caption);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.progress-track{height:1px;background:var(--rule);position:relative;overflow:hidden}
+.progress-fill{
+  position:absolute;inset:0 auto 0 0;height:1px;background:var(--ink);width:0;
+  transition:width var(--dur) var(--ease);
+}
+.progress--failed .progress-fill{background:var(--oxide)}
+.progress--failed .progress-stage{color:var(--oxide)}
+
+/* step list — glyph system borrowed from the reference's +/- menu */
+.steps{list-style:none;margin:var(--s4) 0 0;padding:0;border-top:1px solid var(--rule)}
+.step{
+  display:grid;grid-template-columns:22px 1fr auto;gap:var(--s2);
+  padding:11px 0;border-bottom:1px solid var(--rule);align-items:center;
+  color:var(--muted);font-size:var(--t-small);
+  transition:color var(--dur) var(--ease);
+}
+.step-glyph{font-family:var(--mono);font-size:12px;text-align:center;line-height:1}
+.step-tick{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.step[data-state="running"]{color:var(--ink)}
+.step[data-state="done"]{color:var(--ink)}
+.step[data-state="failed"]{color:var(--oxide)}
+.step[data-state="skipped"]{color:var(--rule)}
+.step[data-state="running"] .step-glyph{animation:pulse 1.4s var(--ease) infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* ============================================================
+   05 COMPONENTS
+   ============================================================ */
+.comp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));border-top:1px solid var(--rule)}
+.comp{
+  border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  padding:var(--s3);
+}
+.comp-name{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:var(--s3);letter-spacing:.06em}
+.comp-note{font-size:11px;color:var(--muted);line-height:1.55;margin:var(--s3) 0 0;max-width:56ch}
+.comp-note code{font-family:var(--mono);font-size:10px;color:var(--ink)}
+.comp-stack{display:flex;flex-direction:column;gap:var(--s2);align-items:flex-start}
+.comp-row{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center}
+
+/* --- Button: underline, never a filled pill --- */
+.btn{
+  font-family:inherit;font-size:var(--t-small);color:var(--ink);
+  background:none;border:none;border-bottom:1px solid var(--ink);
+  padding:0 0 4px;cursor:pointer;letter-spacing:.01em;
+  transition:opacity var(--dur) var(--ease),border-color var(--dur) var(--ease);
+}
+.btn:hover{opacity:.55}
+.btn--secondary{border-bottom-color:var(--rule);color:var(--muted)}
+.btn--secondary:hover{border-bottom-color:var(--ink);color:var(--ink);opacity:1}
+.btn--ghost{border-bottom-color:transparent;color:var(--muted)}
+.btn--ghost:hover{color:var(--ink);opacity:1}
+.btn--danger{color:var(--oxide);border-bottom-color:var(--oxide)}
+.btn[disabled]{color:var(--rule);border-bottom-color:var(--rule);cursor:not-allowed;opacity:1}
+.btn--loading{color:var(--muted);border-bottom-color:var(--muted);cursor:progress}
+.btn--loading::after{content:" ···";font-family:var(--mono);animation:pulse 1.2s var(--ease) infinite}
+
+/* --- Primary action: the only filled element in the system.
+       One per screen, never two. This is the "Buy" of this app. --- */
+.btn--primary{
+  border:none;border-radius:var(--r-control);
+  background:var(--graphite);color:var(--paper);
+  padding:14px var(--s4);min-height:44px;
+  font-size:var(--t-small);letter-spacing:.01em;
+  transition:background var(--dur) var(--ease);
+}
+.btn--primary:hover{background:var(--ink);opacity:1}
+.btn--primary[disabled]{background:var(--rule);color:var(--paper);cursor:not-allowed}
+.btn--block{display:block;width:100%}
+
+/* --- Quantity/port stepper: hairline pill, the reference's other
+       rounded control. Mono numerals, tabular so width is stable. --- */
+.qty{
+  display:flex;align-items:center;justify-content:space-between;
+  border:1px solid var(--rule);border-radius:var(--r-control);
+  padding:6px var(--s3);min-height:44px;min-width:180px;
+}
+.qty button{
+  background:none;border:none;cursor:pointer;color:var(--ink);
+  font-family:inherit;font-size:16px;line-height:1;padding:4px 6px;
+}
+.qty button:hover{opacity:.55}
+.qty-n{font-family:var(--mono);font-size:var(--t-small);font-variant-numeric:tabular-nums}
+
+/* --- Field: underline well, label above in caption case --- */
+.field{display:flex;flex-direction:column;gap:6px;width:100%}
+.field-label{font-size:var(--t-caption);text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
+.field-input{
+  font-family:inherit;font-size:var(--t-body);color:var(--ink);
+  background:none;border:none;border-bottom:1px solid var(--rule);
+  padding:6px 0;width:100%;
+  transition:border-color var(--dur) var(--ease);
+}
+.field-input::placeholder{color:var(--rule)}
+.field-input:focus{outline:none;border-bottom-color:var(--ink)}
+.field-input.mono{font-family:var(--mono)}
+.field-hint{font-size:11px;color:var(--muted);line-height:1.4}
+.field--error .field-input{border-bottom-color:var(--oxide)}
+.field--error .field-hint{color:var(--oxide)}
+.field-row{display:flex;gap:var(--s3);width:100%}
+
+/* --- Select: native, stripped --- */
+.field-select{
+  font-family:inherit;font-size:var(--t-body);color:var(--ink);
+  background:none;border:none;border-bottom:1px solid var(--rule);
+  padding:6px 0;width:100%;appearance:none;cursor:pointer;
+}
+.field-select:focus{outline:none;border-bottom-color:var(--ink)}
+
+/* --- Checkbox: square outline, ink fill, no tick icon --- */
+.check{display:flex;gap:var(--s2);align-items:flex-start;cursor:pointer;width:100%}
+.check input{position:absolute;opacity:0;width:0;height:0}
+.check-box{
+  width:11px;height:11px;border:1px solid var(--ink);flex:none;margin-top:5px;
+  transition:background var(--dur) var(--ease);
+}
+.check input:checked ~ .check-box{background:var(--ink)}
+.check input:focus-visible ~ .check-box{outline:1px solid var(--ink);outline-offset:2px}
+.check-text{font-size:var(--t-small);line-height:1.45}
+.check-sub{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.check--off{cursor:not-allowed}
+.check--off .check-box{border-color:var(--rule)}
+.check--off .check-text{color:var(--rule)}
+
+/* --- Badge: caption case, hairline underline, no pill --- */
+.badge{
+  font-size:var(--t-caption);text-transform:uppercase;letter-spacing:.12em;
+  color:var(--muted);border-bottom:1px solid var(--rule);padding-bottom:2px;
+}
+.badge--ink{color:var(--ink);border-bottom-color:var(--ink)}
+.badge--oxide{color:var(--oxide);border-bottom-color:var(--oxide)}
+
+/* --- Alert: left hairline, no background fill, no icon --- */
+.alert{border-left:1px solid var(--ink);padding:2px 0 2px var(--s2);max-width:52ch}
+.alert-title{font-size:var(--t-small);margin:0 0 3px}
+.alert-body{font-size:11px;color:var(--muted);margin:0;line-height:1.5}
+.alert--warn{border-left-color:var(--muted)}
+.alert--error{border-left-color:var(--oxide)}
+.alert--error .alert-title{color:var(--oxide)}
+
+/* --- Collapsible: +/- affordance from the reference menu --- */
+.coll{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);width:100%}
+.coll-trigger{
+  display:flex;justify-content:space-between;align-items:center;width:100%;
+  background:none;border:none;padding:14px 0;cursor:pointer;
+  font-family:inherit;font-size:var(--t-small);color:var(--ink);text-align:left;
+}
+.coll-sign{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.coll-panel{display:none;padding:0 0 var(--s3)}
+.coll[data-open="true"] .coll-panel{display:flex;flex-direction:column;gap:var(--s3)}
+
+/* --- KeyCard: mono link, hairline cell, copy as text button --- */
+.keycard{border-top:1px solid var(--ink);padding:var(--s2) 0 var(--s3);width:100%}
+.keycard-head{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s2)}
+.keycard-proto{font-size:var(--t-caption);text-transform:uppercase;letter-spacing:.14em}
+.keycard-link{
+  font-family:var(--mono);font-size:11px;line-height:1.6;color:var(--ink);
+  margin:var(--s2) 0 0;word-break:break-all;
+}
+.keycard-foot{display:flex;gap:var(--s3);margin-top:var(--s2);align-items:center}
+
+/* --- Stepper: 01—04, ink for current, rule for pending --- */
+.stepper{display:flex;gap:var(--s3);border-bottom:1px solid var(--rule);padding-bottom:var(--s2)}
+.stepper-item{display:flex;gap:7px;align-items:baseline;font-size:var(--t-caption);text-transform:uppercase;letter-spacing:.12em;color:var(--rule)}
+.stepper-item[data-state="done"]{color:var(--muted)}
+.stepper-item[data-state="current"]{color:var(--ink)}
+.stepper-n{font-family:var(--mono);font-size:9px}
+
+/* --- Modal --- */
+.modal-scrim{
+  position:fixed;inset:0;background:rgba(22,22,20,.14);
+  display:none;align-items:center;justify-content:center;padding:var(--s3);z-index:40;
+}
+.modal-scrim[data-open="true"]{display:flex}
+.modal{background:var(--paper);border:1px solid var(--ink);max-width:440px;width:100%;padding:var(--s3)}
+.modal-title{font-size:var(--t-title);font-weight:400;margin:0 0 var(--s1);letter-spacing:-.01em}
+.modal-body{font-size:var(--t-small);color:var(--muted);margin:0 0 var(--s3);line-height:1.5}
+.modal-foot{display:flex;gap:var(--s3);justify-content:flex-end;border-top:1px solid var(--rule);padding-top:var(--s2)}
+
+/* ============================================================
+   06 SCREENS — split composition from the second reference
+   ============================================================ */
+.screens{display:flex;flex-direction:column;gap:var(--s4);border-top:1px solid var(--rule);padding-top:var(--s4)}
+.window{border:1px solid var(--rule);background:var(--paper);overflow:hidden}
+.window-bar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px var(--s2);border-bottom:1px solid var(--rule);
+}
+.window-dots{display:flex;gap:5px}
+.window-dot{width:7px;height:7px;border:1px solid var(--rule)}
+.window-name{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.06em}
+.split{display:grid;grid-template-columns:38% 1fr;min-height:440px}
+.split-aside{
+  position:relative;padding:var(--s3);display:flex;align-items:flex-end;
+  background:linear-gradient(168deg,#C9CDCB 0%,#B0B7B2 40%,#8A938C 72%,#697269 100%);
+  border-right:1px solid var(--rule);
+}
+.split-caption{
+  font-size:var(--t-caption);text-transform:uppercase;letter-spacing:.12em;
+  color:rgba(255,255,255,.92);line-height:1.7;max-width:30ch;
+}
+.split-main{padding:var(--s3);display:flex;flex-direction:column;gap:var(--s3)}
+.split-brand{font-family:var(--serif);font-size:19px;text-transform:uppercase;letter-spacing:.02em;line-height:1}
+.split-h{font-size:var(--t-title);font-weight:400;margin:0;letter-spacing:-.01em}
+.split-foot{margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end;gap:var(--s2);padding-top:var(--s3);border-top:1px solid var(--rule)}
+
+/* protocol pick cells — the PLP grid at app scale */
+.picks{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
+.pick{
+  border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  padding:var(--s2);min-height:140px;display:flex;flex-direction:column;
+  justify-content:space-between;position:relative;
+}
+.pick-mark{position:absolute;top:var(--s2);right:var(--s2);font-family:var(--mono);font-size:13px;color:var(--muted)}
+.pick-name{font-size:var(--t-small)}
+.pick-meta{font-size:11px;color:var(--muted);line-height:1.5}
+.pick--off .pick-name,.pick--off .pick-meta{color:var(--rule)}
+
+/* ============================================================
+   07 MOTION + 08 TOKENS
+   ============================================================ */
+.rules{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule);max-width:76ch}
+.rules li{
+  border-bottom:1px solid var(--rule);padding:13px 0;font-size:var(--t-small);
+  display:grid;grid-template-columns:26px 1fr;gap:var(--s2);
+}
+.rules b{font-weight:500}
+.rule-n{font-family:var(--mono);font-size:10px;color:var(--muted);padding-top:3px}
+.no{color:var(--oxide)}
+
+pre.code{
+  font-family:var(--mono);font-size:11px;line-height:1.75;color:var(--ink);
+  background:var(--well);border-left:1px solid var(--rule);
+  padding:var(--s3);overflow-x:auto;margin:0;
+}
+.tbl{width:100%;border-collapse:collapse;font-size:var(--t-small)}
+.tbl th{
+  text-align:left;font-weight:400;font-size:var(--t-caption);text-transform:uppercase;
+  letter-spacing:.12em;color:var(--muted);padding:0 var(--s2) var(--s1) 0;
+  border-bottom:1px solid var(--rule);
+}
+.tbl td{padding:11px var(--s2) 11px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+.tbl td.mono{font-size:11px}
+
+.foot{padding:var(--s4);display:flex;justify-content:space-between;gap:var(--s2);flex-wrap:wrap}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width:880px){
+  .band{padding:var(--s4) var(--s3)}
+  .masthead{padding:var(--s3)}
+  .masthead-meta{gap:var(--s2)}
+  .spec-row{grid-template-columns:1fr;gap:var(--s1)}
+  .grid-demo{grid-template-columns:repeat(2,1fr)}
+  .split{grid-template-columns:1fr}
+  .split-aside{min-height:170px;border-right:none;border-bottom:1px solid var(--rule)}
+  .field-row{flex-direction:column;gap:var(--s2)}
+  .sample-wordmark{font-size:30px}
+  :root{--t-display:27px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wordmark">Uplink.</div>
+  <div class="masthead-meta">
+    <span class="eyebrow">Дизайн-код</span>
+    <span class="eyebrow">Версия 1</span>
+    <span class="eyebrow mono">30.07.2026</span>
+  </div>
+</header>
+
+<!-- ========================= 00 ========================= -->
+<section class="band">
+  <div class="band-head">
+    <span class="band-num">00</span>
+    <div>
+      <h2 class="band-title">Направление</h2>
+      <p class="band-note">
+        Uplink разворачивает VPN-протоколы на чужом сервере по SSH. Пользователь отдаёт приложению
+        root-доступ и ждёт. Значит интерфейс должен читаться как точный инструмент, а не как
+        установщик с кнопкой «Далее»: ничего лишнего в кадре, каждый элемент отчитывается о состоянии.
+      </p>
+    </div>
+  </div>
+
+  <ul class="rules">
+    <li><span class="rule-n">01</span><span><b>Линия вместо карточки.</b> Единственный структурный примитив — hairline 1px. Он делит сетку, подчёркивает поля ввода, отделяет шаги и становится дорожкой прогресса. Ни одной рамки-контейнера, ни одной тени, ни одного скругления.</span></li>
+    <li><span class="rule-n">02</span><span><b>Пустота несёт структуру.</b> Группировка достигается расстоянием, а не фоновыми плашками. Если элементы надо разделить — увеличь отступ, не добавляй заливку.</span></li>
+    <li><span class="rule-n">03</span><span><b>Монохром.</b> Чернила, бумага, три оттенка серого. Единственный цвет во всём приложении — оксид <span class="mono">#8C4A38</span>, и только для провала. Цвет = отказ. Из этого следует: успех не зелёный, успех просто чёрный.</span></li>
+    <li><span class="rule-n">04</span><span><b>Иерархия размером, не жирностью.</b> Один вес для интерфейса (400), второй (500) только для акцента внутри строки. Заголовки крупнее, а не толще.</span></li>
+    <li><span class="rule-n">05</span><span><b>Моноширинный = машинное.</b> Всё, что сгенерировал сервер — ссылки, отпечатки, UUID, проценты, коды ошибок — набирается моно. Всё, что написал человек — гротеском. Пользователь различает их не читая.</span></li>
+    <li><span class="rule-n">06</span><span><b>Кнопка это подчёркнутое слово.</b> Никаких залитых прямоугольников. Действие выглядит как текст с линией под ним — того же семейства, что и все остальные линии в интерфейсе.</span></li>
+  </ul>
+
+  <div style="margin-top:var(--s4)">
+    <p class="eyebrow" style="margin-bottom:var(--s1)">Осознанный риск</p>
+    <p class="band-note" style="color:var(--ink)">
+      Прогресс-бар высотой 1 пиксель на всю ширину панели. Полоса не растёт в высоту, не пульсирует,
+      не заполняется штриховкой. Она просто движется вправо, а проценты стоят отдельной моноширинной
+      цифрой в правом поле. Это единственный элемент, которому позволено занять всю ширину, и именно
+      он делает установку похожей на измерение, а не на ожидание.
+    </p>
+  </div>
+</section>
+
+<!-- ========================= 01 ========================= -->
+<section class="band">
+  <div class="band-head">
+    <span class="band-num">01</span>
+    <div>
+      <h2 class="band-title">Палитра</h2>
+      <p class="band-note">Шесть значений. Нейтрально-холодная база, не тёплый крем. Ни один компонент не хардкодит hex, только переменные.</p>
+    </div>
+  </div>
+
+  <div class="swatches">
+    <div class="swatch">
+      <div class="swatch-chip" style="background:#EFEFEE"></div>
+      <div class="swatch-body">
+        <span class="swatch-name">paper</span>
+        <span class="swatch-hex">#EFEFEE</span>
+        <span class="swatch-use">Фон окна. Единственный фон в приложении.</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-chip" style="background:#F6F6F5"></div>
+      <div class="swatch-body">
+        <span class="swatch-name">well</span>
+        <span class="swatch-hex">#F6F6F5</span>
+        <span class="swatch-use">Только блок диагностики и вывод команд. Больше нигде.</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-chip" style="background:#161614"></div>
+      <div class="swatch-body">
+        <span class="swatch-name">ink</span>
+        <span class="swatch-hex">#161614</span>
+        <span class="swatch-use">Текст, заливка прогресса, активные линии, чекбокс.</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-chip" style="background:#8E8E89"></div>
+      <div class="swatch-body">
+        <span class="swatch-name">muted</span>
+        <span class="swatch-hex">#8E8E89</span>
+        <span class="swatch-use">Подписи, подсказки, неактивные шаги, вторичные действия.</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-chip" style="background:#DCDCD8"></div>
+      <div class="swatch-body">
+        <span class="swatch-name">rule</span>
+        <span class="swatch-hex">#DCDCD8</span>
+        <span class="swatch-use">Все hairline-линии, пустая дорожка прогресса, задизейбленное.</span>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-chip" style="background:#8C4A38"></div>
+      <div class="swatch-body">
+        <span class="swatch-name">oxide</span>
+        <span class="swatch-hex">#8C4A38</span>
+        <span class="swatch-use">Провал шага, ошибка поля, удаление. Только отказ, никогда акцент.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========================= 02 ========================= -->
+<section class="band">
+  <div class="band-head">
+    <span class="band-num">02</span>
+    <div>
+      <h2 class="band-title">Типографика</h2>
+      <p class="band-note">
+        Три роли. Серифом набирается только вордмарк — один раз на экран, как подпись.
+        Гротеск несёт весь интерфейс. Моно отвечает за машинные данные.
+      </p>
+    </div>
+  </div>
+
+  <div class="spec">
+    <div class="spec-row">
+      <div class="spec-meta">Instrument Serif<br>26/40px · upper · +.02em<br>только вордмарк</div>
+      <div class="sample-wordmark">Uplink.</div>
+    </div>
+    <div class="spec-row">
+      <div class="spec-meta">Schibsted Grotesk 400<br>34px · −.02em · 1.1<br>заголовок экрана</div>
+      <div class="sample-display">Готово. Забирайте ключи</div>
+    </div>
+    <div class="spec-row">
+      <div class="spec-meta">Schibsted Grotesk 400<br>21px · −.01em<br>заголовок блока</div>
+      <div class="sample-title">Протокол уже установлен</div>
+    </div>
+    <div class="spec-row">
+      <div class="spec-meta">Schibsted Grotesk 400<br>14px · 1.5<br>основной текст</div>
+      <div class="sample-body">Приложение подключится к серверу, поставит нужные пакеты и вернёт готовые ссылки. Домен не потребуется.</div>
+    </div>
+    <div class="spec-row">
+      <div class="spec-meta">Schibsted Grotesk 400<br>10px · upper · +.14em<br>подпись поля, этап, бейдж</div>
+      <div><span class="eyebrow">Генерация ключей Reality</span></div>
+    </div>
+    <div class="spec-row">
+      <div class="spec-meta">JetBrains Mono 400<br>11–13px · tabular<br>машинные данные</div>
+      <div class="sample-mono">vless://8f2c…@203.0.113.7:443?security=reality</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========================= 03 ========================= -->
+<section class="band">
+  <div class="band-head">
+    <span class="band-num">03</span>
+    <div>
+      <h2 class="band-title">Сетка и линия</h2>
+      <p class="band-note">
+        Ячейка обозначается только пересечением линий. Плюс в правом верхнем углу — единая
+        метка «здесь есть действие», она же становится минусом в раскрытом состоянии.
+        Одна ячейка в раскладке может быть отдана изображению во всю площадь: это единственная
+        допустимая цветовая плоскость в интерфейсе.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid-demo">
+    <div class="cell"><span class="cell-plus">+</span><span class="cell-label">ячейка<br>с действием</span></div>
+    <div class="cell"><span class="cell-plus">−</span><span class="cell-label">раскрытая</span></div>
+    <div class="cell cell--filled"></div>
+    <div class="cell cell--photo"></div>
+    <div class="cell"><span class="cell-label">пустая<br>это тоже структура</span></div>
+    <div class="cell"><span class="cell-plus">+</span></div>
+    <div class="cell"><span class="cell-plus">+</span></div>
+    <div class="cell"><span class="cell-label dim">1px · #DCDCD8</span></div>
+  </div>
+</section>
+
+<!-- ========================= 04 ========================= -->
+<section class="band">
+  <div class="band-head">
+    <span class="band-num">04</span>
+    <div>
+      <h2 class="band-title">Прогресс</h2>
+      <p class="band-note">
+        Подпись этапа слева, процент справа, между ними волосяная линия во всю ширину.
+        Список шагов ниже отчитывается глифом: <span class="mono">+</span> ожидает,
+        <span class="mono">·</span> идёт, <span class="mono">−</span> сделано,
+        <span class="mono">×</span> упало, <span class="mono">/</span> пропущено.
+        Никаких галочек и спиннеров.
+      </p>
+    </div>
+  </div>
+
+  <div style="max-width:640px">
+    <div class="progress" id="progress">
+      <div class="progress-head">
+        <span class="progress-stage" id="pStage">Проверка сервера</span>
+        <span class="progress-pct" id="pPct">0 %</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="pFill"></div></div>
+    </div>
+
+    <ul class="steps" id="steps">
+      <li class="step" data-state="pending" data-w="5"><span class="step-glyph">+</span><span>Проверка сервера</span><span class="step-tick">—</span></li>
+      <li class="step" data-state="pending" data-w="5"><span class="step-glyph">+</span><span>Базовые пакеты</span><span class="step-tick">—</span></li>
+      <li class="step" data-state="pending" data-w="25"><span class="step-glyph">+</span><span>Установка ядра Xray</span><span class="step-tick">—</span></li>
+      <li class="step" data-state="pending" data-w="8"><span class="step-glyph">+</span><span>Выбор домена-донора</span><span class="step-tick">—</span></li>
+      <li class="step" data-state="pending" data-w="7"><span class="step-glyph">+</span><span>Генерация ключей Reality</span><span class="step-tick">—</span></li>
+      <li class="step" data-state="pending" data-w="20"><span class="step-glyph">+</span><span>Установка ядра Hysteria2</span><span class="step-tick">—</span></li>
+      <li class="step" data-state="pending" data-w="10"><span class="step-glyph">+</span><span>Сертификат и отпечаток</span><span class="step-tick">—</span></li>
+      <li class="step" data-state="pending" data-w="20"><span class="step-glyph">+</span><span>Запуск и проверка портов</span><span class="step-tick">—</span></li>
+    </ul>
+
+    <div class="comp-row" style="margin-top:var(--s3)">
+      <button class="btn" id="runBtn">Запустить демо</button>
+      <button class="btn btn--danger" id="failBtn">Демо с провалом</button>
+      <button class="btn btn--ghost" id="resetBtn">Сброс</button>
+    </div>
+  </div>
+</section>
+
+<!-- ========================= 05 ========================= -->
+<section class="band">
+  <div class="band-head">
+    <span class="band-num">05</span>
+    <div>
+      <h2 class="band-title">Компоненты</h2>
+      <p class="band-note">Полный перечень примитивов из раздела 9 технического задания, в этом дизайн-коде.</p>
+    </div>
+  </div>
+
+  <div class="comp-grid">
+
+    <div class="comp">
+      <div class="comp-name">Button</div>
+      <div class="comp-stack">
+        <div class="comp-row">
+          <button class="btn btn--primary">Проверить сервер</button>
+          <button class="btn btn--primary" disabled>Установить</button>
+        </div>
+        <div class="comp-row">
+          <button class="btn">Показать полностью</button>
+          <button class="btn btn--secondary">Назад</button>
+        </div>
+        <div class="comp-row">
+          <button class="btn btn--ghost">Диагностика</button>
+          <button class="btn btn--danger">Удалить</button>
+        </div>
+        <div class="comp-row">
+          <button class="btn btn--loading">Подключение</button>
+        </div>
+      </div>
+      <p class="comp-note">Заливная пилюля — единственный залитый элемент системы, одна на экран, никогда две. Всё остальное действие — текст с волосяным подчёркиванием. Кнопка называет результат нажатия, а не действие формы: «Проверить сервер», не «Отправить».</p>
+    </div>
+
+    <div class="comp">
+      <div class="comp-name">Stepper</div>
+      <div class="comp-stack">
+        <div class="qty">
+          <button type="button" aria-label="Уменьшить">−</button>
+          <span class="qty-n">22</span>
+          <button type="button" aria-label="Увеличить">+</button>
+        </div>
+      </div>
+      <p class="comp-note">Вторая и последняя пилюля в системе, но с волосяной обводкой вместо заливки. Цифра в моно с <code>tabular-nums</code>, чтобы ширина не дёргалась при изменении значения.</p>
+    </div>
+
+    <div class="comp">
+      <div class="comp-name">Input · PasswordInput</div>
+      <div class="comp-stack">
+        <label class="field">
+          <span class="field-label">IP сервера</span>
+          <input class="field-input mono" value="203.0.113.7">
+        </label>
+        <label class="field">
+          <span class="field-label">Пароль SSH</span>
+          <input class="field-input" type="password" value="passphrase">
+          <span class="field-hint">Хранится только в памяти до конца установки.</span>
+        </label>
+        <label class="field field--error">
+          <span class="field-label">Порт</span>
+          <input class="field-input mono" value="70000">
+          <span class="field-hint">Порт вне диапазона 1—65535.</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-name">Select · Checkbox</div>
+      <div class="comp-stack">
+        <label class="field">
+          <span class="field-label">Дистрибутив</span>
+          <select class="field-select">
+            <option>Определить автоматически</option>
+            <option>Debian</option>
+            <option>Ubuntu</option>
+          </select>
+        </label>
+        <label class="check">
+          <input type="checkbox" checked>
+          <span class="check-box"></span>
+          <span class="check-text">VLESS + Reality<span class="check-sub">Порт 443/tcp · домен не нужен</span></span>
+        </label>
+        <label class="check check--off">
+          <input type="checkbox" disabled>
+          <span class="check-box"></span>
+          <span class="check-text">Hysteria2<span class="check-sub">Уже установлен на сервере</span></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-name">Badge · Stepper</div>
+      <div class="comp-stack">
+        <div class="comp-row">
+          <span class="badge badge--ink">Установлен</span>
+          <span class="badge">Не запущен</span>
+          <span class="badge badge--oxide">Чужой конфиг</span>
+        </div>
+        <div class="stepper" style="width:100%;margin-top:var(--s2)">
+          <span class="stepper-item" data-state="done"><span class="stepper-n">01</span>Сервер</span>
+          <span class="stepper-item" data-state="current"><span class="stepper-n">02</span>Протоколы</span>
+          <span class="stepper-item"><span class="stepper-n">03</span>Установка</span>
+          <span class="stepper-item"><span class="stepper-n">04</span>Ключи</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-name">Alert</div>
+      <div class="comp-stack">
+        <div class="alert">
+          <p class="alert-title">Донор выбран автоматически</p>
+          <p class="alert-body">Reality маскируется под www.microsoft.com. Ваши DNS-записи не нужны.</p>
+        </div>
+        <div class="alert alert--warn">
+          <p class="alert-title">Firewall не настроен приложением</p>
+          <p class="alert-body">На сервере активен nftables. Правила не тронуты, откройте 443/udp вручную.</p>
+        </div>
+        <div class="alert alert--error">
+          <p class="alert-title">Порт 443/tcp занят процессом nginx</p>
+          <p class="alert-body">Освободите порт или остановите nginx, затем запустите проверку заново.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-name">Collapsible</div>
+      <div class="coll" data-open="false" id="coll">
+        <button class="coll-trigger" id="collBtn">
+          <span>Домен · необязательно</span>
+          <span class="coll-sign" id="collSign">+</span>
+        </button>
+        <div class="coll-panel">
+          <label class="field">
+            <span class="field-label">Домен</span>
+            <input class="field-input mono" placeholder="vpn.example.com">
+          </label>
+          <label class="field">
+            <span class="field-label">Email для ACME</span>
+            <input class="field-input" placeholder="you@example.com">
+          </label>
+          <p class="field-hint">Заполняйте только если хотите доверенный сертификат вместо самоподписанного.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-name">KeyCard · CopyButton</div>
+      <div class="keycard">
+        <div class="keycard-head">
+          <span class="keycard-proto">VLESS + Reality</span>
+          <span class="eyebrow mono">443/tcp</span>
+        </div>
+        <p class="keycard-link">vless://8f2c41ba-7d3e-4c9a-b1f0-2e5d8a6c4b90@203.0.113.7:443?type=tcp&amp;security=reality&amp;flow=xtls-rprx-vision&amp;sni=www.microsoft.com&amp;fp=chrome&amp;pbk=p8MIhWYnijydf3ofqPlnf3p7OquIyXn99yU5WB5y0zo&amp;sid=a1b2c3d4e5f60718#Uplink-VLESS</p>
+        <div class="keycard-foot">
+          <button class="btn btn--copy" data-copy=".keycard-link">Копировать</button>
+          <button class="btn btn--ghost">Сохранить в файл</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-name">Modal</div>
+      <div class="comp-stack">
+        <p class="field-hint" style="max-width:36ch">Модалка конфликта протоколов. Заливка скрима 8% чернил, окно обведено линией в 1px цвета ink.</p>
+        <button class="btn" id="modalOpen">Показать модалку</button>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ========================= 06 ========================= -->
+<section class="band">
+  <div class="band-head">
+    <span class="band-num">06</span>
+    <div>
+      <h2 class="band-title">Экраны</h2>
+      <p class="band-note">
+        Композиция взята из второго референса: левая треть отдана изображению во всю высоту
+        с подписью капслоком внизу, справа рабочая панель. Изображение статично и одинаково
+        на всех четырёх шагах — оно держит кадр, пока справа меняется содержимое.
+      </p>
+    </div>
+  </div>
+
+  <div class="screens">
+
+    <!-- Шаг 1 -->
+    <div class="window">
+      <div class="window-bar">
+        <div class="window-dots"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div>
+        <span class="window-name">01 · подключение</span>
+      </div>
+      <div class="split">
+        <div class="split-aside">
+          <p class="split-caption">Собственный сервер, два протокола, ни одного ручного конфига. Домен не требуется.</p>
+        </div>
+        <div class="split-main">
+          <div class="split-brand">Uplink.</div>
+          <div class="stepper">
+            <span class="stepper-item" data-state="current"><span class="stepper-n">01</span>Сервер</span>
+            <span class="stepper-item"><span class="stepper-n">02</span>Протоколы</span>
+            <span class="stepper-item"><span class="stepper-n">03</span>Установка</span>
+            <span class="stepper-item"><span class="stepper-n">04</span>Ключи</span>
+          </div>
+          <h3 class="split-h">Данные сервера</h3>
+          <div class="field-row">
+            <label class="field" style="flex:2">
+              <span class="field-label">IP или хост</span>
+              <input class="field-input mono" value="203.0.113.7">
+            </label>
+            <label class="field" style="flex:1">
+              <span class="field-label">Порт</span>
+              <input class="field-input mono" value="22">
+            </label>
+          </div>
+          <div class="field-row">
+            <label class="field">
+              <span class="field-label">Пользователь</span>
+              <input class="field-input" value="root">
+            </label>
+            <label class="field">
+              <span class="field-label">Пароль</span>
+              <input class="field-input" type="password" value="passphrase">
+            </label>
+          </div>
+          <label class="field">
+            <span class="field-label">Дистрибутив</span>
+            <select class="field-select"><option>Определить автоматически</option><option>Debian</option><option>Ubuntu</option></select>
+          </label>
+          <div class="coll" data-open="false">
+            <button class="coll-trigger coll-t"><span>Домен · необязательно</span><span class="coll-sign">+</span></button>
+            <div class="coll-panel">
+              <label class="field"><span class="field-label">Домен</span><input class="field-input mono" placeholder="vpn.example.com"></label>
+              <label class="field"><span class="field-label">Email для ACME</span><input class="field-input" placeholder="you@example.com"></label>
+            </div>
+          </div>
+          <div class="split-foot">
+            <span class="eyebrow">Пароль не сохраняется на диск</span>
+            <button class="btn btn--primary">Проверить сервер</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Шаг 2 -->
+    <div class="window">
+      <div class="window-bar">
+        <div class="window-dots"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div>
+        <span class="window-name">02 · выбор по</span>
+      </div>
+      <div class="split">
+        <div class="split-aside">
+          <p class="split-caption">Reality занимает 443 по TCP, Hysteria2 — 443 по UDP. Ставятся вместе.</p>
+        </div>
+        <div class="split-main">
+          <div class="split-brand">Uplink.</div>
+          <div class="stepper">
+            <span class="stepper-item" data-state="done"><span class="stepper-n">01</span>Сервер</span>
+            <span class="stepper-item" data-state="current"><span class="stepper-n">02</span>Протоколы</span>
+            <span class="stepper-item"><span class="stepper-n">03</span>Установка</span>
+            <span class="stepper-item"><span class="stepper-n">04</span>Ключи</span>
+          </div>
+          <div>
+            <h3 class="split-h">Что поставить</h3>
+            <p class="field-hint" style="margin-top:6px">Debian 13 · x86_64 · systemd · порты свободны</p>
+          </div>
+
+          <div class="picks">
+            <div class="pick">
+              <span class="pick-mark">+</span>
+              <div>
+                <div class="pick-name">VLESS + Reality</div>
+                <p class="pick-meta">Маскировка под чужой TLS. Домен не нужен.</p>
+              </div>
+              <label class="check"><input type="checkbox" checked><span class="check-box"></span><span class="check-text">Установить</span></label>
+            </div>
+            <div class="pick pick--off">
+              <span class="pick-mark">−</span>
+              <div>
+                <div class="pick-name">Hysteria2</div>
+                <p class="pick-meta">Найден на сервере, сервис активен.</p>
+              </div>
+              <div class="comp-row">
+                <span class="badge badge--ink">Установлен</span>
+                <button class="btn btn--ghost" style="font-size:11px">Управление</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert--warn">
+            <p class="alert-title">Hysteria2 переустановить нельзя без удаления</p>
+            <p class="alert-body">Старые ссылки перестанут работать. Откройте управление, чтобы удалить или переустановить.</p>
+          </div>
+
+          <div class="split-foot">
+            <button class="btn btn--secondary">Назад</button>
+            <button class="btn btn--primary">Установить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Шаг 3 -->
+    <div class="window">
+      <div class="window-bar">
+        <div class="window-dots"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div>
+        <span class="window-name">03 · установка</span>
+      </div>
+      <div class="split">
+        <div class="split-aside">
+          <p class="split-caption">Ставим ядро, пишем конфиг, поднимаем сервис. Прерывать нежелательно.</p>
+        </div>
+        <div class="split-main">
+          <div class="split-brand">Uplink.</div>
+          <div class="stepper">
+            <span class="stepper-item" data-state="done"><span class="stepper-n">01</span>Сервер</span>
+            <span class="stepper-item" data-state="done"><span class="stepper-n">02</span>Протоколы</span>
+            <span class="stepper-item" data-state="current"><span class="stepper-n">03</span>Установка</span>
+            <span class="stepper-item"><span class="stepper-n">04</span>Ключи</span>
+          </div>
+
+          <div class="progress">
+            <div class="progress-head">
+              <span class="progress-stage">Установка ядра Xray</span>
+              <span class="progress-pct">34 %</span>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:34%"></div></div>
+          </div>
+
+          <ul class="steps" style="margin-top:var(--s3)">
+            <li class="step" data-state="done"><span class="step-glyph">−</span><span>Проверка сервера</span><span class="step-tick">4 с</span></li>
+            <li class="step" data-state="done"><span class="step-glyph">−</span><span>Базовые пакеты</span><span class="step-tick">11 с</span></li>
+            <li class="step" data-state="running"><span class="step-glyph">·</span><span>Установка ядра Xray</span><span class="step-tick">18 с</span></li>
+            <li class="step" data-state="pending"><span class="step-glyph">+</span><span>Генерация ключей Reality</span><span class="step-tick">—</span></li>
+            <li class="step" data-state="pending"><span class="step-glyph">+</span><span>Запуск и проверка портов</span><span class="step-tick">—</span></li>
+          </ul>
+
+          <div class="split-foot">
+            <span class="eyebrow">Точка невозврата не пройдена</span>
+            <button class="btn btn--secondary">Отменить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Шаг 4 -->
+    <div class="window">
+      <div class="window-bar">
+        <div class="window-dots"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div>
+        <span class="window-name">04 · ключи</span>
+      </div>
+      <div class="split">
+        <div class="split-aside">
+          <p class="split-caption">Ссылки показываются один раз. Приложение их не хранит.</p>
+        </div>
+        <div class="split-main">
+          <div class="split-brand">Uplink.</div>
+          <div class="stepper">
+            <span class="stepper-item" data-state="done"><span class="stepper-n">01</span>Сервер</span>
+            <span class="stepper-item" data-state="done"><span class="stepper-n">02</span>Протоколы</span>
+            <span class="stepper-item" data-state="done"><span class="stepper-n">03</span>Установка</span>
+            <span class="stepper-item" data-state="current"><span class="stepper-n">04</span>Ключи</span>
+          </div>
+
+          <h3 class="split-h">Готово. Забирайте ключи</h3>
+
+          <div class="keycard">
+            <div class="keycard-head">
+              <span class="keycard-proto">VLESS + Reality</span>
+              <span class="eyebrow mono">443/tcp</span>
+            </div>
+            <p class="keycard-link">vless://8f2c41ba-7d3e-4c9a-b1f0-2e5d8a6c4b90@203.0.113.7:443?type=tcp&amp;security=reality&amp;flow=xtls-rprx-vision&amp;sni=www.microsoft.com&amp;fp=chrome&amp;pbk=p8MIhWYnijydf3ofqPlnf3p7OquIyXn99yU5WB5y0zo&amp;sid=a1b2c3d4e5f60718#Uplink-VLESS</p>
+            <div class="keycard-foot">
+              <button class="btn btn--copy" data-copy=".keycard-link">Копировать</button>
+            </div>
+          </div>
+
+          <div class="keycard">
+            <div class="keycard-head">
+              <span class="keycard-proto">Hysteria2</span>
+              <span class="eyebrow mono">443/udp</span>
+            </div>
+            <p class="keycard-link" id="hy2link">hy2://xK9mQ2vRt7wLpN4zByH8cFdA@203.0.113.7:443?sni=bing.com&amp;insecure=1&amp;pinSHA256=A4F1C8B27E5D9036AB1E7F4C2D8B5069E3A7C1F4B8D2E6093A5C7F1B4D8E2069#Uplink-HY2</p>
+            <div class="keycard-foot">
+              <button class="btn btn--copy" data-copy="#hy2link">Копировать</button>
+              <button class="btn btn--ghost">Ссылка без пина</button>
+            </div>
+          </div>
+
+          <div class="split-foot">
+            <button class="btn btn--ghost">Сохранить всё в файл</button>
+            <button class="btn">Готово</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ========================= 07 ========================= -->
+<section class="band">
+  <div class="band-head">
+    <span class="band-num">07</span>
+    <div>
+      <h2 class="band-title">Движение</h2>
+      <p class="band-note">Одна длительность, одна кривая. Анимация обслуживает только смену состояния, не привлекает внимание.</p>
+    </div>
+  </div>
+
+  <table class="tbl" style="max-width:720px">
+    <thead><tr><th style="width:32%">Что</th><th style="width:26%">Как</th><th>Почему</th></tr></thead>
+    <tbody>
+      <tr><td>Заливка прогресса</td><td class="mono">width 220ms<br>cubic-bezier(.22,.61,.36,1)</td><td>Полоса догоняет реальный процент, не имитирует движение между шагами.</td></tr>
+      <tr><td>Глиф активного шага</td><td class="mono">opacity 1 → .25<br>1.4s · infinite</td><td>Единственная цикличная анимация. Показывает, что процесс жив.</td></tr>
+      <tr><td>Смена шага визарда</td><td class="mono">opacity 220ms</td><td>Без сдвигов и слайдов: кадр держится изображением слева, содержимое просто заменяется.</td></tr>
+      <tr><td>Наведение на действие</td><td class="mono">opacity → .55</td><td>Линия под словом остаётся на месте, меняется только плотность.</td></tr>
+      <tr><td class="no">Запрещено</td><td class="no mono">—</td><td class="no">Скругления, тени, штриховка в прогрессе, спиннеры, слайд-переходы, тряска на ошибке, счётчик, бегущий к 90% в ожидании.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ========================= 08 ========================= -->
+<section class="band">
+  <div class="band-head">
+    <span class="band-num">08</span>
+    <div>
+      <h2 class="band-title">Токены и реализация</h2>
+      <p class="band-note">Блок для <span class="mono">src/renderer/src/styles/index.css</span>. Tailwind v4, токены объявляются один раз, компоненты берут только переменные.</p>
+    </div>
+  </div>
+
+<pre class="code">@import "tailwindcss";
+
+@theme {
+  --color-paper:  #EFEFEE;
+  --color-well:   #F6F6F5;
+  --color-ink:    #161614;
+  --color-muted:  #8E8E89;
+  --color-rule:   #DCDCD8;
+  --color-oxide:  #8C4A38;
+
+  --font-serif: "Instrument Serif", Didot, serif;
+  --font-sans:  "Schibsted Grotesk", "Helvetica Neue", sans-serif;
+  --font-mono:  "JetBrains Mono", ui-monospace, monospace;
+
+  --text-display: 34px;
+  --text-title:   21px;
+  --text-body:    14px;
+  --text-small:   13px;
+  --text-caption: 10px;
+
+  --tracking-caption: 0.14em;
+
+  /* Two radii and nothing between them. Every intermediate value
+     (sm/md/lg/xl) is deliberately absent from the theme so the rule
+     is enforced by the toolchain, not by discipline. */
+  --radius-none: 0px;
+  --radius-control: 999px;
+
+  --color-graphite: #3A3A37;
+
+  --ease-uplink: cubic-bezier(.22,.61,.36,1);
+}
+
+/* Shadow is disabled project-wide: the hairline is the only
+   structural device. Radius is allowed only at its two values. */
+@layer base {
+  * { box-shadow: none !important; }
+}</pre>
+
+  <div style="margin-top:var(--s4)">
+    <p class="eyebrow" style="margin-bottom:var(--s1)">Расхождение с техническим заданием</p>
+    <div class="alert alert--error" style="max-width:66ch">
+      <p class="alert-title">Раздел 9 tech.md задаёт окно 480 × 720</p>
+      <p class="alert-body">
+        Эта композиция на 480px не собирается: сплит с изображением слева схлопывается,
+        прогресс-бар превращается в короткий отрезок и теряет смысл, воздух между полями
+        исчезает. Нужно либо поднять окно до 1040 × 680 и оставить сплит, либо отказаться
+        от левой панели и вернуться к одной колонке. Первое сохраняет дизайн-код, второе
+        сохраняет размер окна. Раздел 9 придётся править в любом случае, вместе с bump версии ядра.
+      </p>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <span class="eyebrow">Uplink · дизайн-код · версия 1.1</span>
+  <span class="eyebrow mono">Instrument Serif · Schibsted Grotesk · JetBrains Mono</span>
+</footer>
+
+<!-- ========================= MODAL ========================= -->
+<div class="modal-scrim" data-open="false" id="scrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <h3 class="modal-title" id="mTitle">Hysteria2 уже установлен</h3>
+    <p class="modal-body">
+      На сервере найден рабочий Hysteria2. Установить его повторно нельзя.
+      Переустановка выдаст новые ключи, старые ссылки перестанут работать.
+    </p>
+    <div class="comp-stack" style="margin-bottom:var(--s3)">
+      <label class="check"><input type="checkbox" checked><span class="check-box"></span><span class="check-text">Hysteria2<span class="check-sub">Сервис активен · 443/udp</span></span></label>
+      <label class="check"><input type="checkbox"><span class="check-box"></span><span class="check-text">VLESS + Reality<span class="check-sub">Сервис активен · 443/tcp</span></span></label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn--ghost" id="modalClose">Отмена</button>
+      <button class="btn btn--danger">Удалить</button>
+      <button class="btn">Переустановить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- progress demo ---------- */
+  var GLYPH = {pending:"+",running:"\u00B7",done:"\u2212",failed:"\u00D7",skipped:"/"};
+  var stepsEl = document.getElementById("steps");
+  var items   = Array.prototype.slice.call(stepsEl.querySelectorAll(".step"));
+  var wrap    = document.getElementById("progress");
+  var fill    = document.getElementById("pFill");
+  var pct     = document.getElementById("pPct");
+  var stage   = document.getElementById("pStage");
+  var total   = items.reduce(function(s,el){return s + Number(el.dataset.w);},0);
+  var timer   = null;
+
+  function paint(el, state, tick){
+    el.dataset.state = state;
+    el.querySelector(".step-glyph").textContent = GLYPH[state];
+    el.querySelector(".step-tick").textContent  = tick;
+  }
+
+  function reset(){
+    if(timer){clearTimeout(timer); timer = null;}
+    wrap.classList.remove("progress--failed");
+    items.forEach(function(el){paint(el,"pending","\u2014");});
+    fill.style.width = "0%";
+    pct.textContent = "0 %";
+    stage.textContent = items[0].children[1].textContent;
+  }
+
+  function run(failAt){
+    reset();
+    var i = 0, acc = 0;
+    (function next(){
+      if(i >= items.length){
+        stage.textContent = "Готово";
+        pct.textContent = "100 %";
+        return;
+      }
+      var el = items[i];
+      paint(el,"running","\u2026");
+      stage.textContent = el.children[1].textContent;
+
+      timer = setTimeout(function(){
+        if(failAt === i){
+          paint(el,"failed","\u2014");
+          wrap.classList.add("progress--failed");
+          stage.textContent = "Сбой: " + el.children[1].textContent;
+          for(var k = i + 1; k < items.length; k++){paint(items[k],"skipped","\u2014");}
+          return;
+        }
+        acc += Number(el.dataset.w);
+        paint(el,"done",(Math.round(Math.random()*14) + 3) + " с");
+        var p = Math.floor(acc / total * 100);
+        fill.style.width = p + "%";
+        pct.textContent = p + " %";
+        i++;
+        next();
+      }, 620);
+    })();
+  }
+
+  document.getElementById("runBtn").addEventListener("click", function(){run(-1);});
+  document.getElementById("failBtn").addEventListener("click", function(){run(5);});
+  document.getElementById("resetBtn").addEventListener("click", reset);
+  reset();
+
+  /* ---------- collapsibles ---------- */
+  function toggle(coll){
+    var open = coll.dataset.open === "true";
+    coll.dataset.open = open ? "false" : "true";
+    var sign = coll.querySelector(".coll-sign");
+    if(sign){sign.textContent = open ? "+" : "\u2212";}
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".coll-trigger"), function(btn){
+    btn.addEventListener("click", function(){toggle(btn.closest(".coll"));});
+  });
+
+  /* ---------- copy ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll(".btn--copy"), function(btn){
+    btn.addEventListener("click", function(){
+      var src = document.querySelector(btn.dataset.copy);
+      if(!src) return;
+      var done = function(){
+        var was = btn.textContent;
+        btn.textContent = "Скопировано";
+        setTimeout(function(){btn.textContent = was;}, 2000);
+      };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(src.textContent).then(done, done);
+      } else { done(); }
+    });
+  });
+
+  /* ---------- modal ---------- */
+  var scrim = document.getElementById("scrim");
+  document.getElementById("modalOpen").addEventListener("click", function(){
+    scrim.dataset.open = "true";
+  });
+  document.getElementById("modalClose").addEventListener("click", function(){
+    scrim.dataset.open = "false";
+  });
+  scrim.addEventListener("click", function(e){
+    if(e.target === scrim){scrim.dataset.open = "false";}
+  });
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Escape"){scrim.dataset.open = "false";}
+  });
+})();
+</script>
+</body>
+</html>
