@@ -4,9 +4,10 @@ import { Button } from '../../ui/Button';
 import { Modal } from '../../ui/Modal';
 
 /**
- * Listens for main-process hostkey:prompt events (TOFU flow, tech.md 5.1)
- * and renders the fingerprint confirmation modal. Mounted once at the app
- * root; stays inert until a real ssh:check triggers a prompt (stage 2+).
+ * Listens for main-process hostkey:prompt events and renders the TOFU
+ * confirmation modal (tech.md 5.1). Only fires for a genuinely new host:
+ * a changed fingerprint is a hard stop (E_SSH_HOSTKEY_MISMATCH) handled
+ * as a regular connect error, never routed through this prompt.
  */
 export function HostKeyPromptModal() {
   const [prompt, setPrompt] = useState<HostKeyPromptEvent | null>(null);
@@ -23,26 +24,21 @@ export function HostKeyPromptModal() {
   return (
     <Modal
       open
-      title={prompt.known ? 'Отпечаток сервера изменился' : 'Новый сервер'}
+      title="Новый сервер"
       onClose={() => respond(false)}
       footer={
         <>
           <Button variant="ghost" onClick={() => respond(false)}>
             Отмена
           </Button>
-          <Button variant={prompt.known ? 'danger' : 'primary'} onClick={() => respond(true)}>
-            {prompt.known ? 'Всё равно доверять' : 'Доверять'}
+          <Button variant="primary" onClick={() => respond(true)}>
+            Доверять
           </Button>
         </>
       }
     >
       <p>{prompt.host}</p>
-      <p className="mt-1 break-all font-mono text-[11px] text-ink">{prompt.fingerprint}</p>
-      {prompt.known && (
-        <p className="mt-2 text-oxide">
-          Это может означать подмену сервера (MITM) либо переустановку ОС на прежнем IP.
-        </p>
-      )}
+      <p className="mono mt-1 break-all text-ink">{prompt.fingerprint}</p>
     </Modal>
   );
 }
