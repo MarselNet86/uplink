@@ -34,6 +34,90 @@ export const checkRequestSchema = z.object({
   params: deployParamsSchema,
 });
 
+export const errorCodeSchema = z.enum([
+  'E_NET_UNREACHABLE',
+  'E_SSH_AUTH',
+  'E_SSH_HOSTKEY_MISMATCH',
+  'E_TIMEOUT',
+  'E_NO_SUDO',
+  'E_DISTRO_UNSUPPORTED',
+  'E_ARCH_UNSUPPORTED',
+  'E_NO_SYSTEMD',
+  'E_NO_OUTBOUND',
+  'E_APT_LOCKED',
+  'E_PORT_BUSY',
+  'E_DNS_MISMATCH',
+  'E_ACME_FAILED',
+  'E_NO_REALITY_DONOR',
+  'E_CERT_GENERATION_FAILED',
+  'E_DOWNLOAD_FAILED',
+  'E_CONFIG_INVALID',
+  'E_SERVICE_FAILED',
+  'E_ALREADY_INSTALLED',
+  'E_FOREIGN_CONFIG',
+  'E_CANCELLED',
+  'E_UNKNOWN',
+]);
+
+export const appErrorSchema = z.object({
+  code: errorCodeSchema,
+  message: z.string(),
+  hint: z.string().optional(),
+});
+
+export const distroInfoSchema = z.object({
+  id: distroIdSchema,
+  versionId: z.string(),
+  prettyName: z.string(),
+  arch: z.union([z.literal('x86_64'), z.literal('aarch64')]),
+  hasSystemd: z.boolean(),
+});
+
+export const checkIdSchema = z.enum([
+  'tcp',
+  'auth',
+  'privileges',
+  'distro',
+  'arch',
+  'systemd',
+  'outbound',
+  'ports',
+  'dns',
+  'apt-lock',
+]);
+
+export const checkItemSchema = z.object({
+  id: checkIdSchema,
+  status: z.union([z.literal('ok'), z.literal('warn'), z.literal('fail')]),
+  detail: z.string().optional(),
+});
+
+export const preflightReportSchema = z.object({
+  items: z.array(checkItemSchema),
+  passed: z.boolean(),
+});
+
+export const protocolStateSchema = z.union([
+  z.literal('absent'),
+  z.literal('installed'),
+  z.literal('broken'),
+  z.literal('foreign'),
+]);
+
+export const protocolStatusSchema = z.object({
+  protocol: protocolIdSchema,
+  state: protocolStateSchema,
+  version: z.string().optional(),
+  serviceActive: z.boolean(),
+});
+
+export const checkResultSchema = z.object({
+  sessionId: z.string().min(1),
+  distro: distroInfoSchema,
+  preflight: preflightReportSchema,
+  protocols: z.array(protocolStatusSchema),
+});
+
 export const installModeSchema = z.union([z.literal('install'), z.literal('reinstall')]);
 
 export const installRequestSchema = z.object({
