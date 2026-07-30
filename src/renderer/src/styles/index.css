@@ -651,6 +651,44 @@ body {
     padding-top: var(--s3);
     border-top: 1px solid var(--rule);
   }
+
+  /* --- Protocol pick cells (step 2, design code 06) --- */
+  .picks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--rule);
+    border-left: 1px solid var(--rule);
+  }
+  .pick {
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: var(--s2);
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+  }
+  .pick-mark {
+    position: absolute;
+    top: var(--s2);
+    right: var(--s2);
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .pick-name {
+    font-size: var(--t-small);
+  }
+  .pick-meta {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .pick--off .pick-name,
+  .pick--off .pick-meta {
+    color: var(--rule);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
