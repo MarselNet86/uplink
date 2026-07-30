@@ -61,6 +61,18 @@ export const hostkeyConfirmRequestSchema = z.object({
   accepted: z.boolean(),
 });
 
+export type HostkeyConfirmRequest = z.infer<typeof hostkeyConfirmRequestSchema>;
+
+/** Named shape for the hostkey:prompt send-channel payload (tech.md section 6). */
+export const hostKeyPromptEventSchema = z.object({
+  promptId: z.string().min(1),
+  host: z.string().min(1),
+  fingerprint: z.string().min(1),
+  known: z.boolean(),
+});
+
+export type HostKeyPromptEvent = z.infer<typeof hostKeyPromptEventSchema>;
+
 /** Stage 0 skeleton demo channel payload. */
 export const demoPingRequestSchema = z.object({
   message: z.string().min(1).max(200),
