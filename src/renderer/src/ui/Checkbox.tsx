@@ -1,5 +1,3 @@
-import * as RadixCheckbox from '@radix-ui/react-checkbox';
-import { Check } from 'lucide-react';
 import { cn } from './lib/utils';
 
 export interface CheckboxProps {
@@ -11,6 +9,7 @@ export interface CheckboxProps {
   className?: string;
 }
 
+/** Square outline, ink fill, no tick icon (design code 05). */
 export function Checkbox({
   checked,
   onCheckedChange,
@@ -20,26 +19,17 @@ export function Checkbox({
   className,
 }: CheckboxProps) {
   return (
-    <label
-      className={cn(
-        'flex cursor-pointer items-start gap-3',
-        disabled && 'cursor-not-allowed opacity-60',
-        className,
-      )}
-    >
-      <RadixCheckbox.Root
+    <label className={cn('check', disabled && 'check--off', className)}>
+      <input
+        type="checkbox"
         checked={checked}
-        onCheckedChange={(value) => onCheckedChange(value === true)}
         disabled={disabled}
-        className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-structure border border-rule bg-transparent data-[state=checked]:border-ink data-[state=checked]:bg-ink"
-      >
-        <RadixCheckbox.Indicator className="text-paper">
-          <Check size={12} strokeWidth={3} />
-        </RadixCheckbox.Indicator>
-      </RadixCheckbox.Root>
-      <span className="flex flex-col">
-        <span className="text-[length:var(--t-body)] text-ink">{label}</span>
-        {description && <span className="text-[11px] text-muted">{description}</span>}
+        onChange={(e) => onCheckedChange(e.target.checked)}
+      />
+      <span className="check-box" />
+      <span className="check-text">
+        {label}
+        {description && <span className="check-sub">{description}</span>}
       </span>
     </label>
   );

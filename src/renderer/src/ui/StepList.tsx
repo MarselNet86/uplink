@@ -1,39 +1,29 @@
 import type { StepView } from '@shared/types';
-import { cn } from './lib/utils';
 
 export interface StepListProps {
   steps: StepView[];
+  ticks?: Partial<Record<StepView['id'], string>>;
 }
 
-const statusText: Record<StepView['status'], string> = {
-  pending: '',
-  running: '…',
-  done: 'готово',
-  failed: 'ошибка',
-  skipped: 'пропущено',
+const GLYPH: Record<StepView['status'], string> = {
+  pending: '+',
+  running: '·',
+  done: '−',
+  failed: '×',
+  skipped: '/',
 };
 
-export function StepList({ steps }: StepListProps) {
+/** No checkmarks, no spinners: a glyph per state (design code 04). */
+export function StepList({ steps, ticks }: StepListProps) {
   return (
-    <ol className="flex flex-col gap-2">
+    <ul className="steps">
       {steps.map((step) => (
-        <li
-          key={step.id}
-          data-state={step.status}
-          className={cn(
-            'flex items-center justify-between text-[length:var(--t-small)] text-muted transition-colors',
-            step.status === 'running' && 'text-ink',
-            step.status === 'done' && 'text-ink',
-            step.status === 'failed' && 'text-oxide',
-            step.status === 'skipped' && 'text-rule',
-          )}
-        >
+        <li key={step.id} data-state={step.status} className="step">
+          <span className="step-glyph">{GLYPH[step.status]}</span>
           <span>{step.title}</span>
-          <span className="font-mono text-[11px] tabular-nums text-muted">
-            {statusText[step.status]}
-          </span>
+          <span className="step-tick">{ticks?.[step.id] ?? '—'}</span>
         </li>
       ))}
-    </ol>
+    </ul>
   );
 }

@@ -8,11 +8,11 @@ const EXTERNAL_URL_ALLOWLIST = new Set<string>([]);
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 480,
-    height: 720,
+    width: 1040,
+    height: 680,
     resizable: false,
     autoHideMenuBar: true,
-    backgroundColor: '#161614',
+    backgroundColor: '#EFEFEE',
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,

@@ -28,7 +28,7 @@ const demoSteps: StepView[] = [
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3 border-b border-rule pb-6">
-      <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted">{title}</h2>
+      <h2 className="eyebrow">{title}</h2>
       {children}
     </section>
   );
@@ -46,7 +46,10 @@ export function KitchenSink() {
   };
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6 p-6">
+    <div
+      className="mx-auto flex max-w-md flex-col gap-6 overflow-y-auto p-6"
+      style={{ height: '100%' }}
+    >
       <h1 className="font-serif text-[length:var(--t-display)]">Kitchen sink</h1>
 
       <Section title="Stepper">
@@ -55,21 +58,21 @@ export function KitchenSink() {
 
       <Section title="Buttons">
         <div className="flex flex-wrap items-center gap-4">
-          <Button variant="primary">Primary</Button>
-          <Button variant="secondary">Secondary</Button>
-          <Button variant="ghost">Ghost</Button>
-          <Button variant="danger">Danger</Button>
-          <Button variant="primary" loading>
-            Loading
-          </Button>
+          <Button variant="primary">Проверить сервер</Button>
           <Button variant="primary" disabled>
-            Disabled
+            Установить
+          </Button>
+          <Button variant="secondary">Назад</Button>
+          <Button variant="ghost">Диагностика</Button>
+          <Button variant="danger">Удалить</Button>
+          <Button variant="primary" loading>
+            Подключение
           </Button>
         </div>
       </Section>
 
       <Section title="Inputs">
-        <Input label="IP / хост" placeholder="203.0.113.10" hint="IPv4, IPv6 или FQDN" />
+        <Input label="IP / хост" placeholder="203.0.113.10" hint="IPv4, IPv6 или FQDN" mono />
         <Input label="SSH user" error="Поле не может быть пустым" />
         <PasswordInput label="SSH password" placeholder="••••••••" />
         <Select
@@ -77,9 +80,9 @@ export function KitchenSink() {
           value={distro}
           onChange={setDistro}
           options={[
-            { value: 'auto', label: 'auto' },
-            { value: 'debian', label: 'debian' },
-            { value: 'ubuntu', label: 'ubuntu' },
+            { value: 'auto', label: 'Определить автоматически' },
+            { value: 'debian', label: 'Debian' },
+            { value: 'ubuntu', label: 'Ubuntu' },
           ]}
         />
       </Section>
@@ -89,34 +92,34 @@ export function KitchenSink() {
           checked={checked}
           onCheckedChange={setChecked}
           label="VLESS + Reality"
-          description="443/tcp"
+          description="Порт 443/tcp · домен не нужен"
         />
         <Checkbox
           checked={false}
           onCheckedChange={() => {}}
           disabled
-          label="Hysteria2 (недоступно)"
+          label="Hysteria2"
+          description="Уже установлен на сервере"
         />
       </Section>
 
       <Section title="Alert">
-        <Alert tone="info" title="Проверка подключения">
-          Сервер отвечает на порт 22.
+        <Alert tone="info" title="Донор выбран автоматически">
+          Reality маскируется под www.microsoft.com. Ваши DNS-записи не нужны.
         </Alert>
-        <Alert tone="warn" title="Внимание">
-          Обнаружен нестандартный порт SSH.
+        <Alert tone="warn" title="Firewall не настроен приложением">
+          На сервере активен nftables. Правила не тронуты, откройте 443/udp вручную.
         </Alert>
-        <Alert tone="error" title="Ошибка подключения">
-          Не удалось авторизоваться по SSH.
+        <Alert tone="error" title="Порт 443/tcp занят процессом nginx">
+          Освободите порт или остановите nginx, затем запустите проверку заново.
         </Alert>
       </Section>
 
       <Section title="Badge">
-        <div className="flex gap-2">
-          <Badge tone="default">absent</Badge>
-          <Badge tone="success">installed</Badge>
-          <Badge tone="warn">broken</Badge>
-          <Badge tone="danger">foreign</Badge>
+        <div className="flex gap-3">
+          <Badge tone="default">Не запущен</Badge>
+          <Badge tone="success">Установлен</Badge>
+          <Badge tone="danger">Чужой конфиг</Badge>
         </div>
       </Section>
 
@@ -125,8 +128,8 @@ export function KitchenSink() {
       </Section>
 
       <Section title="Modal">
-        <Button variant="secondary" onClick={() => setModalOpen(true)}>
-          Открыть модалку
+        <Button variant="ghost" onClick={() => setModalOpen(true)}>
+          Показать модалку
         </Button>
         <Modal
           open={modalOpen}
@@ -136,6 +139,9 @@ export function KitchenSink() {
             <>
               <Button variant="ghost" onClick={() => setModalOpen(false)}>
                 Отмена
+              </Button>
+              <Button variant="danger" onClick={() => setModalOpen(false)}>
+                Удалить
               </Button>
               <Button variant="primary" onClick={() => setModalOpen(false)}>
                 Переустановить
@@ -148,9 +154,8 @@ export function KitchenSink() {
       </Section>
 
       <Section title="ProgressBar">
-        <ProgressBar percent={45} />
-        <ProgressBar percent={0} indeterminate />
-        <ProgressBar percent={70} failed />
+        <ProgressBar stage="Установка ядра Xray" percent={34} />
+        <ProgressBar stage="Сбой: запуск сервиса" percent={70} failed />
       </Section>
 
       <Section title="StepList">
@@ -160,6 +165,7 @@ export function KitchenSink() {
       <Section title="KeyCard + CopyButton">
         <KeyCard
           protocol="vless-reality"
+          port="443/tcp"
           link="vless://uuid@203.0.113.10:443?type=tcp&security=reality#Uplink-VLESS"
         />
         <CopyButton value="hy2://password@203.0.113.10:443" />
@@ -175,7 +181,7 @@ export function KitchenSink() {
         <Button variant="secondary" onClick={runDemoPing}>
           window.uplink.demoPing()
         </Button>
-        {pingResult && <p className="font-mono text-[11px] text-muted">{pingResult}</p>}
+        {pingResult && <p className="eyebrow mono">{pingResult}</p>}
       </Section>
     </div>
   );

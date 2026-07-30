@@ -1,29 +1,24 @@
 import { cn } from './lib/utils';
 
 export interface ProgressBarProps {
+  stage: string;
   percent: number;
-  indeterminate?: boolean;
   failed?: boolean;
   className?: string;
 }
 
-export function ProgressBar({ percent, indeterminate, failed, className }: ProgressBarProps) {
+/** Stage label left, percent right, hairline track between (design code 04). */
+export function ProgressBar({ stage, percent, failed, className }: ProgressBarProps) {
+  const clamped = Math.min(100, Math.max(0, percent));
   return (
-    <div
-      role="progressbar"
-      aria-valuenow={indeterminate ? undefined : Math.round(percent)}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      className={cn('h-px w-full bg-rule', className)}
-    >
-      <div
-        className={cn(
-          'h-px transition-[width] duration-200 ease-out',
-          failed ? 'bg-oxide' : 'bg-ink',
-          indeterminate && 'w-1/3 animate-pulse',
-        )}
-        style={indeterminate ? undefined : { width: `${Math.min(100, Math.max(0, percent))}%` }}
-      />
+    <div className={cn('progress', failed && 'progress--failed', className)}>
+      <div className="progress-head">
+        <span className="progress-stage">{stage}</span>
+        <span className="progress-pct">{Math.floor(clamped)} %</span>
+      </div>
+      <div className="progress-track">
+        <div className="progress-fill" style={{ width: `${clamped}%` }} />
+      </div>
     </div>
   );
 }

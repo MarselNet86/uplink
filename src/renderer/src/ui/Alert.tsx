@@ -8,20 +8,17 @@ export interface AlertProps {
   className?: string;
 }
 
-const toneClasses: Record<AlertProps['tone'], string> = {
-  info: 'border-rule text-ink',
-  warn: 'border-oxide/60 text-ink',
-  error: 'border-oxide text-oxide',
+const toneClass: Record<AlertProps['tone'], string> = {
+  info: '',
+  warn: 'alert--warn',
+  error: 'alert--error',
 };
 
 export function Alert({ tone, title, children, className }: AlertProps) {
   return (
-    <div
-      role="alert"
-      className={cn('rounded-structure border-l-2 px-4 py-3', toneClasses[tone], className)}
-    >
-      <p className="text-[length:var(--t-small)] font-medium">{title}</p>
-      {children && <div className="mt-1 text-[length:var(--t-small)] text-muted">{children}</div>}
+    <div role="alert" className={cn('alert', toneClass[tone], className)}>
+      <p className="alert-title">{title}</p>
+      {children && <p className="alert-body">{children}</p>}
     </div>
   );
 }

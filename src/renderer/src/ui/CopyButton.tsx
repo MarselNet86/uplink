@@ -16,14 +16,7 @@ export function CopyButton({ value, className }: CopyButtonProps) {
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className={cn(
-        'border-b border-rule text-[length:var(--t-small)] text-muted hover:border-ink hover:text-ink',
-        className,
-      )}
-    >
+    <button type="button" onClick={handleClick} className={cn('btn', className)}>
       {copied ? 'Скопировано' : 'Копировать'}
     </button>
   );
