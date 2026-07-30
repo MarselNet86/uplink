@@ -90,6 +90,7 @@ uplink/
       types.ts                    # доменные DTO (ЗАМОРОЖЕНО)
       errors.ts                   # коды ошибок (ЗАМОРОЖЕНО)
       schemas.ts                  # zod-схемы для валидации на обеих границах
+      planBuilder.ts               # PlanBuilder: чистая функция, нужна и main, и renderer (шаг 2)
     preload/
       index.ts                    # contextBridge.exposeInMainWorld('uplink', api)
     main/
@@ -125,7 +126,6 @@ uplink/
           listenPorts.ts
           certFingerprint.ts      # разбор вывода openssl x509 -fingerprint в pinSHA256-формат
         LinkBuilder.ts            # генерация vless:// и hy2:// (чистая функция), обе TLS-ветки
-        PlanBuilder.ts            # выбор шагов и весов прогресса, зависит от TlsMode
       pipeline/
         Step.ts                   # интерфейс шага
         Pipeline.ts               # последовательный запуск, отмена, откат
