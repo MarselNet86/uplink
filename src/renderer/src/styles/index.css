@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens. Hairline as the single structural primitive, no shadows,
+ * no gradients. Radius has exactly two values: 0 for structure, 999px for
+ * controls. Dark is the default theme; light follows the OS preference.
+ * Adapted from docs/design-reference.html (the reference is a light mock,
+ * this file is the dark-default source of truth actually shipped).
+ */
+:root {
+  --paper: #161614;
+  --well: #1d1d1a;
+  --ink: #efefee;
+  --muted: #8e8e89;
+  --rule: #35352f;
+  --oxide: #c98467;
+  --graphite: #d8d8d4;
+
+  --serif: 'Instrument Serif', Didot, 'Times New Roman', serif;
+  --sans: 'Schibsted Grotesk', 'Helvetica Neue', Inter, Arial, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --t-display: 34px;
+  --t-title: 21px;
+  --t-body: 14px;
+  --t-small: 13px;
+  --t-caption: 10px;
+
+  --s1: 8px;
+  --s2: 16px;
+  --s3: 24px;
+  --s4: 40px;
+  --s5: 64px;
+  --s6: 96px;
+
+  --r-structure: 0;
+  --r-control: 999px;
+
+  --dur: 220ms;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --paper: #efefee;
+    --well: #f6f6f5;
+    --ink: #161614;
+    --muted: #8e8e89;
+    --rule: #dcdcd8;
+    --oxide: #8c4a38;
+    --graphite: #3a3a37;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-well: var(--well);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-oxide: var(--oxide);
+  --color-graphite: var(--graphite);
+  --font-serif: var(--serif);
+  --font-sans: var(--sans);
+  --font-mono: var(--mono);
+  --radius-structure: var(--r-structure);
+  --radius-control: var(--r-control);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--t-body);
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--paper);
+}
