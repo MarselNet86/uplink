@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { RunResult } from '@shared/types';
+import type { ProtocolId, RunResult } from '@shared/types';
 import { Alert } from '../../ui/Alert';
 import { Button } from '../../ui/Button';
+import { Checkbox } from '../../ui/Checkbox';
 import { KeyCard } from '../../ui/KeyCard';
 import { PROTOCOL_PORT, PROTOCOL_TITLE } from '../select/protocolCopy';
 import { ERROR_TEXT } from '../common/errorText';
@@ -11,9 +12,15 @@ export interface ResultStepProps {
   onDone: () => void;
 }
 
+/** Removes `&pinSHA256=...` for the "link without pin" fallback (tech.md 5.9) - clients on some builds fail to parse a hy2 link that includes the pin. */
+function stripPinSha256(link: string): string {
+  return link.replace(/[?&]pinSHA256=[^&#]*/, '');
+}
+
 /** Step 4 (tech.md section 4): one KeyCard per successful protocol, an alert per failed one. Links are shown once and never persisted by the app itself. */
 export function ResultStep({ result, onDone }: ResultStepProps) {
   const [copiedAll, setCopiedAll] = useState(false);
+  const [noPin, setNoPin] = useState<Set<ProtocolId>>(new Set());
   const succeeded = result.outcomes.filter((o) => o.ok && o.link);
 
   const allLinksText = succeeded.map((o) => o.link).join('\n');
@@ -28,6 +35,15 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
     await window.uplink.saveTextFile({ suggestedName: 'uplink-keys.txt', content: allLinksText });
   };
 
+  const togglePin = (protocol: ProtocolId, withoutPin: boolean) => {
+    setNoPin((prev) => {
+      const next = new Set(prev);
+      if (withoutPin) next.add(protocol);
+      else next.delete(protocol);
+      return next;
+    });
+  };
+
   return (
     <>
       <div>
@@ -37,16 +53,30 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
         </p>
       </div>
 
-      {succeeded.map((outcome) =>
-        outcome.link ? (
+      {succeeded.map((outcome) => {
+        if (!outcome.link) return null;
+        const hasPin = outcome.link.includes('pinSHA256=');
+        const link =
+          hasPin && noPin.has(outcome.protocol) ? stripPinSha256(outcome.link) : outcome.link;
+        return (
           <KeyCard
             key={outcome.protocol}
             protocol={outcome.protocol}
             port={PROTOCOL_PORT[outcome.protocol]}
-            link={outcome.link}
+            link={link}
+            footerExtra={
+              hasPin ? (
+                <Checkbox
+                  checked={noPin.has(outcome.protocol)}
+                  onCheckedChange={(checked) => togglePin(outcome.protocol, checked)}
+                  label="Ссылка без пина"
+                  description="Для клиентов, у которых ломается pinSHA256"
+                />
+              ) : undefined
+            }
           />
-        ) : null,
-      )}
+        );
+      })}
 
       {result.outcomes
         .filter((o) => !o.ok)
