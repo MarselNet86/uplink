@@ -12,6 +12,13 @@ export interface CommandResult {
 
 export interface ICommandRunner {
   run(command: string, opts?: { timeoutMs?: number; stdin?: string }): Promise<CommandResult>;
+  /**
+   * Runs a command that needs root, wrapping it with sudo when the SSH
+   * user isn't root (tech.md 5.1). Kept as a second interface method
+   * rather than folded into run() so preflight's own `id -u`/`sudo -n
+   * true` probes can call run() unwrapped and get an honest answer.
+   */
+  runPrivileged(command: string, opts?: { timeoutMs?: number }): Promise<CommandResult>;
 }
 
 export interface IFileTransfer {

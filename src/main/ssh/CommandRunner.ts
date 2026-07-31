@@ -39,8 +39,14 @@ export class CommandRunner implements ICommandRunner {
     return this.exec(command, opts);
   }
 
+  /** ICommandRunner.runPrivileged: primes sudo once, then wraps and runs. */
+  async runPrivileged(command: string, opts?: { timeoutMs?: number }): Promise<CommandResult> {
+    await this.primeSudo();
+    return this.exec(this.wrapPrivileged(command), opts);
+  }
+
   /** Wraps a command that needs root, per tech.md 5.1. No-op when already root. */
-  wrapPrivileged(command: string): string {
+  private wrapPrivileged(command: string): string {
     if (this.username === 'root') return command;
     return `sudo -n -S -p '' sh -c ${shellQuote(command)}`;
   }
@@ -50,7 +56,7 @@ export class CommandRunner implements ICommandRunner {
    * to `sudo -n -S -p '' true`, so subsequent wrapPrivileged() commands run
    * with `-n` (non-interactive) without needing the password again.
    */
-  async primeSudo(): Promise<void> {
+  private async primeSudo(): Promise<void> {
     if (this.sudoPrimed || this.username === 'root') return;
     const result = await this.exec(`sudo -n -S -p '' true`, {
       timeoutMs: 15_000,

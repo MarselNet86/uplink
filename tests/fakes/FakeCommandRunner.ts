@@ -25,4 +25,13 @@ export class FakeCommandRunner implements ICommandRunner {
     this.calls.push(command);
     return this.scripted.get(command) ?? this.defaultResult;
   }
+
+  /**
+   * Fakes don't need real sudo-wrapping semantics (that's covered at the
+   * CommandRunner level) - tests script against the plain command string,
+   * same map as run().
+   */
+  async runPrivileged(command: string): Promise<CommandResult> {
+    return this.run(command);
+  }
 }

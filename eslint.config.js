@@ -5,7 +5,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   {
-    ignores: ['node_modules', 'out', 'dist', 'build', '.npm-cache', 'docs/**'],
+    ignores: ['node_modules', 'out', 'dist', 'build', '.npm-cache', 'docs/**', '.claude/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

@@ -5,3 +5,4 @@ build
 .npm-cache
 docs/design-reference.html
 tech.md
+.claude
