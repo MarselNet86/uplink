@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import type { CheckResult } from '@shared/types';
-import type { AppError } from '@shared/types';
+import type { AppError, CheckResult, DeployParams } from '@shared/types';
 import { Alert } from '../../ui/Alert';
 import { Button } from '../../ui/Button';
 import { Checkbox } from '../../ui/Checkbox';
@@ -24,7 +23,7 @@ const initialValues: ConnectFormValues = {
 };
 
 export interface ConnectFormProps {
-  onChecked: (result: CheckResult) => void;
+  onChecked: (result: CheckResult, params: DeployParams) => void;
 }
 
 export function ConnectForm({ onChecked }: ConnectFormProps) {
@@ -44,6 +43,14 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
 
     setLoading(true);
     try {
+      const params: DeployParams = values.domainEnabled
+        ? {
+            distroHint: values.distroHint,
+            tlsMode: 'acme-domain',
+            domain: values.domain.trim(),
+            acmeEmail: values.acmeEmail.trim(),
+          }
+        : { distroHint: values.distroHint, tlsMode: 'self-signed' };
       const result = await window.uplink.sshCheck({
         credentials: {
           host: values.host.trim(),
@@ -51,16 +58,9 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
           username: values.username.trim(),
           password: values.password,
         },
-        params: values.domainEnabled
-          ? {
-              distroHint: values.distroHint,
-              tlsMode: 'acme-domain',
-              domain: values.domain.trim(),
-              acmeEmail: values.acmeEmail.trim(),
-            }
-          : { distroHint: values.distroHint, tlsMode: 'self-signed' },
+        params,
       });
-      onChecked(result);
+      onChecked(result, params);
     } catch (err) {
       setServerError(err as AppError);
     } finally {

@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import type { ProtocolId } from '@shared/types';
+import { useEffect, useState } from 'react';
+import type { CheckResult, DeployParams, ProtocolId } from '@shared/types';
 import { useAppStore } from './store/useAppStore';
 import { KitchenSink } from './features/common/KitchenSink';
 import { WizardShell } from './features/common/WizardShell';
 import { ConnectForm } from './features/connect/ConnectForm';
 import { HostKeyPromptModal } from './features/connect/HostKeyPromptModal';
+import { InstallStep } from './features/install/InstallStep';
 import { ConflictModal } from './features/manage/ConflictModal';
+import { ResultStep } from './features/result/ResultStep';
 import { SelectStep } from './features/select/SelectStep';
 
 export default function App() {
@@ -13,9 +15,72 @@ export default function App() {
   const setRoute = useAppStore((state) => state.setRoute);
   const checkResult = useAppStore((state) => state.checkResult);
   const setCheckResult = useAppStore((state) => state.setCheckResult);
+  const deployParams = useAppStore((state) => state.deployParams);
+  const setDeployParams = useAppStore((state) => state.setDeployParams);
+  const run = useAppStore((state) => state.run);
+  const startRun = useAppStore((state) => state.startRun);
+  const setRunSteps = useAppStore((state) => state.setRunSteps);
+  const setRunStep = useAppStore((state) => state.setRunStep);
+  const setRunNote = useAppStore((state) => state.setRunNote);
+  const finishRun = useAppStore((state) => state.finishRun);
+  const resetRun = useAppStore((state) => state.resetRun);
   const [manageOpen, setManageOpen] = useState(false);
 
+  useEffect(
+    () =>
+      window.uplink.onProgress((event) => {
+        if (event.type === 'started') {
+          startRun(event.runId);
+          setRunSteps(event.steps);
+        } else if (event.type === 'step') {
+          setRunStep(event.stepId, event.status, event.percent);
+        } else if (event.type === 'note') {
+          setRunNote(event.message);
+        } else {
+          finishRun(event.result);
+        }
+      }),
+    [startRun, setRunSteps, setRunStep, setRunNote, finishRun],
+  );
+
   const foundProtocols = checkResult?.protocols.filter((p) => p.state !== 'absent') ?? [];
+
+  const handleChecked = (result: CheckResult, params: DeployParams) => {
+    setCheckResult(result);
+    setDeployParams(params);
+  };
+
+  const handleInstall = async (protocols: ProtocolId[]) => {
+    if (!checkResult || !deployParams) return;
+    try {
+      await window.uplink.installStart({
+        sessionId: checkResult.sessionId,
+        protocols,
+        mode: 'install',
+        params: deployParams,
+      });
+    } catch {
+      // install:start only rejects on a stale/missing session; the user is
+      // still on step 2 and can re-run the check to get a fresh one.
+    }
+  };
+
+  const handleDone = () => {
+    resetRun();
+    setCheckResult(null);
+    setDeployParams(null);
+  };
+
+  const step = !checkResult ? 1 : !run ? 2 : !run.result ? 3 : 4;
+
+  const caption =
+    step === 1
+      ? 'Собственный сервер, два протокола, ни одного ручного конфига. Домен не требуется.'
+      : step === 2
+        ? 'Reality занимает 443 по TCP, Hysteria2 — 443 по UDP. Ставятся вместе.'
+        : step === 3
+          ? 'Каждый шаг идемпотентен и проверяем перед переходом к следующему.'
+          : 'Сохраните ссылки сейчас — приложение их больше не покажет.';
 
   return (
     <>
@@ -30,27 +95,18 @@ export default function App() {
       {route === 'kitchen-sink' && <KitchenSink />}
 
       {route === 'wizard' && (
-        <WizardShell
-          step={checkResult ? 2 : 1}
-          caption={
-            checkResult
-              ? 'Reality занимает 443 по TCP, Hysteria2 — 443 по UDP. Ставятся вместе.'
-              : 'Собственный сервер, два протокола, ни одного ручного конфига. Домен не требуется.'
-          }
-        >
-          {checkResult ? (
+        <WizardShell step={step} caption={caption}>
+          {step === 1 && <ConnectForm onChecked={handleChecked} />}
+          {step === 2 && checkResult && (
             <SelectStep
               result={checkResult}
               onBack={() => setCheckResult(null)}
               onManage={() => setManageOpen(true)}
-              onInstall={(protocols: ProtocolId[]) => {
-                // Wired to install:start once the pipeline lands (stage 5).
-                void protocols;
-              }}
+              onInstall={(protocols) => void handleInstall(protocols)}
             />
-          ) : (
-            <ConnectForm onChecked={setCheckResult} />
           )}
+          {step === 3 && <InstallStep />}
+          {step === 4 && run?.result && <ResultStep result={run.result} onDone={handleDone} />}
         </WizardShell>
       )}
 
