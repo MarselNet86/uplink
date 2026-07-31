@@ -1,6 +1,6 @@
 {
   "name": "uplink",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Uplink - deploy VLESS+Reality and Hysteria2 to your VPS over SSH",
