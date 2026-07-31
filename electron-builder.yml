@@ -24,9 +24,11 @@ mac:
         - arm64
   hardenedRuntime: false
 linux:
-  # deb needs package.json "homepage" (no public repo yet); add it back once one exists.
   target:
     - target: AppImage
+      arch:
+        - x64
+    - target: deb
       arch:
         - x64
   category: Network

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Uplink - deploy VLESS+Reality and Hysteria2 to your VPS over SSH",
+  "homepage": "https://github.com/MarselNet86/uplink",
   "author": {
     "name": "daimon",
     "email": "marsel.shamsutdinov@icloud.com"
