@@ -1,13 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
-import { DEMO_IPC, IPC } from '@shared/ipc';
+import { DEMO_IPC, FILE_IPC, IPC } from '@shared/ipc';
 import { decodeAppError } from '@shared/ipcError';
-import type { AppError, CheckRequest, CheckResult } from '@shared/types';
+import type {
+  AppError,
+  CheckRequest,
+  CheckResult,
+  InstallRequest,
+  ProgressEvent,
+  RunHandle,
+} from '@shared/types';
 import type {
   DemoPingRequest,
   DemoPingResponse,
   HostkeyConfirmRequest,
   HostKeyPromptEvent,
+  SaveTextFileRequest,
 } from '@shared/schemas';
 
 /**
@@ -47,6 +55,21 @@ const api = {
     ipcRenderer.on(IPC.HOSTKEY_PROMPT, listener);
     return () => ipcRenderer.removeListener(IPC.HOSTKEY_PROMPT, listener);
   },
+
+  installStart: (payload: InstallRequest): Promise<RunHandle> =>
+    invokeChecked(IPC.INSTALL_START, payload),
+
+  installCancel: (runId: string): Promise<{ accepted: boolean }> =>
+    ipcRenderer.invoke(IPC.INSTALL_CANCEL, { runId }),
+
+  onProgress: (callback: (event: ProgressEvent) => void): (() => void) => {
+    const listener = (_event: IpcRendererEvent, payload: ProgressEvent): void => callback(payload);
+    ipcRenderer.on(IPC.PROGRESS_EVENT, listener);
+    return () => ipcRenderer.removeListener(IPC.PROGRESS_EVENT, listener);
+  },
+
+  saveTextFile: (payload: SaveTextFileRequest): Promise<{ saved: boolean }> =>
+    ipcRenderer.invoke(FILE_IPC.SAVE_TEXT_FILE, payload),
 };
 
 export type UplinkApi = typeof api;

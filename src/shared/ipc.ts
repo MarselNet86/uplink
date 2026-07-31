@@ -20,4 +20,16 @@ export const DEMO_IPC = {
   DEMO_PING: 'demo:ping',
 } as const;
 
-export type IpcChannel = (typeof IPC)[keyof typeof IPC] | (typeof DEMO_IPC)[keyof typeof DEMO_IPC];
+/**
+ * OS file-save dialog, backing the step 4 "Сохранить в файл" button (tech.md
+ * section 4). Not part of the frozen domain contract in section 6 - it is a
+ * generic Electron dialog utility, not an ssh/install/progress channel.
+ */
+export const FILE_IPC = {
+  SAVE_TEXT_FILE: 'file:saveText',
+} as const;
+
+export type IpcChannel =
+  | (typeof IPC)[keyof typeof IPC]
+  | (typeof DEMO_IPC)[keyof typeof DEMO_IPC]
+  | (typeof FILE_IPC)[keyof typeof FILE_IPC];
