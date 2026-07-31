@@ -14,7 +14,7 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     backgroundColor: '#EFEFEE',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,

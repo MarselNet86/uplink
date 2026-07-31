@@ -11,12 +11,33 @@ export default defineConfig({
         '@shared': resolve('src/shared'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          format: 'cjs',
+          entryFileNames: '[name].cjs',
+        },
+      },
+    },
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    // externalizeDeps defaults to true even without the plugin (electron-vite
+    // still auto-externalizes package.json deps), which breaks the sandboxed
+    // preload context: it cannot require() arbitrary node_modules, only Node
+    // built-ins and Electron APIs, so npm deps (zod, via @shared/ipcError)
+    // must be bundled in rather than left as bare require() calls.
     resolve: {
       alias: {
         '@shared': resolve('src/shared'),
+      },
+    },
+    build: {
+      externalizeDeps: false,
+      rollupOptions: {
+        output: {
+          format: 'cjs',
+          entryFileNames: '[name].cjs',
+        },
       },
     },
   },
