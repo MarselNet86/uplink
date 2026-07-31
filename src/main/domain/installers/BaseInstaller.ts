@@ -1,10 +1,28 @@
 import { randomUUID } from 'node:crypto';
-import type { AppError, ProtocolId, ProtocolOutcome } from '@shared/types';
+import type { AppError, ProtocolId, ProtocolOutcome, StepId } from '@shared/types';
 import { shellQuote } from '../../security/shellQuote';
+import type { Step } from '../../pipeline/Step';
 import type { ICommandRunner, IFileTransfer } from '../../ssh/types';
 import { InstallerError } from './InstallerError';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+export interface StepSpec {
+  id: StepId;
+  title: string;
+  weight: number;
+}
+
+/** Per-phase StepId/title/weight metadata (tech.md 5.11 weight table), one entry per fixed template phase. */
+export interface InstallerStepSpecs {
+  prepare: StepSpec;
+  installCore: StepSpec;
+  generateSecrets: StepSpec;
+  writeConfig: StepSpec;
+  validate: StepSpec;
+  start: StepSpec;
+  verify: StepSpec;
+}
 
 /**
  * Template Method base for protocol installers (tech.md 10.2): install()
@@ -23,6 +41,7 @@ export abstract class BaseInstaller {
   ) {}
 
   protected abstract readonly protocol: ProtocolId;
+  protected abstract readonly stepSpecs: InstallerStepSpecs;
 
   protected abstract prepare(): Promise<void>;
   protected abstract installCore(): Promise<void>;
@@ -32,6 +51,13 @@ export abstract class BaseInstaller {
   protected abstract start(): Promise<void>;
   protected abstract verify(): Promise<void>;
   protected abstract buildLink(): string;
+
+  /** Restores `.bak` config and stops the service; only called by Pipeline on cancellation after the point of no return (tech.md 5.12). */
+  abstract rollback(): Promise<void>;
+
+  get protocolId(): ProtocolId {
+    return this.protocol;
+  }
 
   async install(): Promise<ProtocolOutcome> {
     try {
@@ -46,6 +72,47 @@ export abstract class BaseInstaller {
     } catch (err) {
       return { protocol: this.protocol, ok: false, error: this.toAppError(err) };
     }
+  }
+
+  /** Returns the finished outcome; only valid to call after a Pipeline run over buildSteps() completed successfully. */
+  getOutcome(): ProtocolOutcome {
+    return { protocol: this.protocol, ok: true, link: this.buildLink() };
+  }
+
+  /**
+   * Wraps the same fixed eight phases install() calls as Step objects, so a
+   * top-level orchestrator can concatenate several installers' steps into
+   * one Pipeline run and get one shared progress bar (tech.md 5.11: "общий
+   * прогресс-бар"). The phase order itself stays fixed here, never in the
+   * subclass - only the id/title/weight per phase is subclass-supplied.
+   */
+  buildSteps(): Step[] {
+    const phases: Array<[StepSpec, () => Promise<void>]> = [
+      [this.stepSpecs.prepare, () => this.prepare()],
+      [this.stepSpecs.installCore, () => this.installCore()],
+      [this.stepSpecs.generateSecrets, () => this.generateSecrets()],
+      [this.stepSpecs.writeConfig, () => this.writeConfig()],
+      [this.stepSpecs.validate, () => this.validate()],
+      [this.stepSpecs.start, () => this.start()],
+      [this.stepSpecs.verify, () => this.verify()],
+    ];
+    return phases.map(([spec, run]) => ({
+      id: spec.id,
+      title: spec.title,
+      weight: spec.weight,
+      critical: true,
+      run,
+    }));
+  }
+
+  /** The step at which this installer starts writing state to the server - the pipeline's point of no return. */
+  getConfigStepId(): StepId {
+    return this.stepSpecs.writeConfig.id;
+  }
+
+  /** True if `stepId` belongs to this installer's own buildSteps(), used to attribute a Pipeline failure to a protocol. */
+  ownsStep(stepId: StepId): boolean {
+    return this.buildSteps().some((step) => step.id === stepId);
   }
 
   /** Warnings collected during install (e.g. firewall not touched); read by the pipeline that aggregates RunResult.warnings (stage 5). */
@@ -130,7 +197,8 @@ export abstract class BaseInstaller {
     await this.runner.runPrivileged(`ufw allow ${port}/${proto}`);
   }
 
-  private toAppError(err: unknown): AppError {
+  /** Maps a caught phase error to the frozen AppError shape (tech.md section 8). */
+  toAppError(err: unknown): AppError {
     if (err instanceof InstallerError) return { code: err.code, message: err.message };
     return {
       code: 'E_UNKNOWN',

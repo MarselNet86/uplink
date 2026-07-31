@@ -148,3 +148,36 @@ describe('XrayRealityInstaller - error paths', () => {
     expect(runner.calls).not.toContain('systemctl enable --now xray');
   });
 });
+
+describe('XrayRealityInstaller - pipeline integration', () => {
+  it('buildSteps() exposes the eight fixed phases in order with the tech.md 5.11 weights', () => {
+    const { installer } = install(makeHappyRunner());
+    const steps = installer.buildSteps();
+
+    expect(steps.map((s) => [s.id, s.weight])).toEqual([
+      ['base-packages', 5],
+      ['xray-install', 25],
+      ['xray-keys', 3],
+      ['xray-config', 3],
+      ['xray-validate', 2],
+      ['xray-start', 5],
+      ['xray-verify', 7],
+    ]);
+    expect(installer.getConfigStepId()).toBe('xray-config');
+    expect(installer.ownsStep('xray-verify')).toBe(true);
+    expect(installer.ownsStep('hy2-verify')).toBe(false);
+  });
+
+  it('rollback() restores the config backup and stops the service', async () => {
+    const runner = makeHappyRunner();
+    const { installer } = install(runner);
+
+    await installer.rollback();
+
+    const restoreIdx = runner.calls.indexOf(
+      `test -f '${XRAY_CONFIG_PATH}.bak' && cp '${XRAY_CONFIG_PATH}.bak' '${XRAY_CONFIG_PATH}' || true`,
+    );
+    expect(restoreIdx).toBeGreaterThanOrEqual(0);
+    expect(runner.calls).toContain('systemctl stop xray');
+  });
+});

@@ -41,12 +41,15 @@ export class SshSession {
   private idleTimer: NodeJS.Timeout | undefined;
   private disposed = false;
 
+  private readonly host: string;
+
   private constructor(
     private readonly client: Client,
     credentials: ServerCredentials,
   ) {
     this.commandRunner = new CommandRunner(client, credentials.username, credentials.password);
     this.fileTransfer = new FileTransfer(client);
+    this.host = credentials.host;
     this.armIdleTimer();
   }
 
@@ -106,6 +109,10 @@ export class SshSession {
   getFileTransfer(): FileTransfer {
     this.armIdleTimer();
     return this.fileTransfer;
+  }
+
+  getHost(): string {
+    return this.host;
   }
 
   dispose(): void {

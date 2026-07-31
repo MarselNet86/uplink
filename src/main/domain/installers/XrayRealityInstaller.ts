@@ -7,6 +7,7 @@ import { parseX25519Output } from '../parsers/x25519';
 import { buildVlessLink } from '../LinkBuilder';
 import { REALITY_DONORS } from '../RealityDonors';
 import { BaseInstaller } from './BaseInstaller';
+import type { InstallerStepSpecs } from './BaseInstaller';
 import { InstallerError } from './InstallerError';
 
 export const XRAY_CONFIG_PATH = '/usr/local/etc/xray/config.json';
@@ -85,6 +86,19 @@ export function buildXrayConfig(params: {
  */
 export class XrayRealityInstaller extends BaseInstaller {
   protected readonly protocol: ProtocolId = 'vless-reality';
+
+  // Weights from tech.md 5.11's default table (base packages 5, core install
+  // 25, keys 3, config 3, validate 2, start 5, verify 7); StepId values from
+  // tech.md section 7.
+  protected readonly stepSpecs: InstallerStepSpecs = {
+    prepare: { id: 'base-packages', title: 'Установка базовых пакетов', weight: 5 },
+    installCore: { id: 'xray-install', title: 'Установка ядра Xray', weight: 25 },
+    generateSecrets: { id: 'xray-keys', title: 'Генерация ключей', weight: 3 },
+    writeConfig: { id: 'xray-config', title: 'Запись конфигурации', weight: 3 },
+    validate: { id: 'xray-validate', title: 'Проверка конфигурации', weight: 2 },
+    start: { id: 'xray-start', title: 'Запуск сервиса', weight: 5 },
+    verify: { id: 'xray-verify', title: 'Проверка работы', weight: 7 },
+  };
 
   private uuid = '';
   private privateKey = '';
@@ -216,5 +230,13 @@ export class XrayRealityInstaller extends BaseInstaller {
       publicKey: this.publicKey,
       shortId: this.shortId,
     });
+  }
+
+  // Only reached if the user cancels after writeConfig has run (tech.md
+  // 5.12): restore the pre-install config and stop the service we may have
+  // just started, undoing exactly what writeConfig()/start() did.
+  async rollback(): Promise<void> {
+    await this.restoreBackup(XRAY_CONFIG_PATH);
+    await this.runner.runPrivileged('systemctl stop xray');
   }
 }
