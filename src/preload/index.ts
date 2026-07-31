@@ -8,6 +8,7 @@ import type {
   CheckResult,
   InstallRequest,
   ProgressEvent,
+  RemoveRequest,
   RunHandle,
 } from '@shared/types';
 import type {
@@ -61,6 +62,9 @@ const api = {
 
   installCancel: (runId: string): Promise<{ accepted: boolean }> =>
     ipcRenderer.invoke(IPC.INSTALL_CANCEL, { runId }),
+
+  protocolsRemove: (payload: RemoveRequest): Promise<RunHandle> =>
+    invokeChecked(IPC.PROTOCOLS_REMOVE, payload),
 
   onProgress: (callback: (event: ProgressEvent) => void): (() => void) => {
     const listener = (_event: IpcRendererEvent, payload: ProgressEvent): void => callback(payload);

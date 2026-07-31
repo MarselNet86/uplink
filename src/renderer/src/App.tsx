@@ -65,6 +65,32 @@ export default function App() {
     }
   };
 
+  const handleRemove = async (protocols: ProtocolId[]) => {
+    if (!checkResult) return;
+    setManageOpen(false);
+    try {
+      await window.uplink.protocolsRemove({ sessionId: checkResult.sessionId, protocols });
+    } catch {
+      // protocols:remove only rejects on a stale/missing session; the user
+      // is still on step 2 and can re-run the check to get a fresh one.
+    }
+  };
+
+  const handleReinstall = async (protocols: ProtocolId[]) => {
+    if (!checkResult || !deployParams) return;
+    setManageOpen(false);
+    try {
+      await window.uplink.installStart({
+        sessionId: checkResult.sessionId,
+        protocols,
+        mode: 'reinstall',
+        params: deployParams,
+      });
+    } catch {
+      // same as handleRemove: a stale session just leaves the user on step 2.
+    }
+  };
+
   const handleDone = () => {
     resetRun();
     setCheckResult(null);
@@ -80,7 +106,9 @@ export default function App() {
         ? 'Reality занимает 443 по TCP, Hysteria2 — 443 по UDP. Ставятся вместе.'
         : step === 3
           ? 'Каждый шаг идемпотентен и проверяем перед переходом к следующему.'
-          : 'Сохраните ссылки сейчас — приложение их больше не покажет.';
+          : run?.result?.outcomes.some((o) => o.ok && o.link)
+            ? 'Сохраните ссылки сейчас — приложение их больше не покажет.'
+            : 'Готово — можно вернуться и проверить сервер ещё раз.';
 
   return (
     <>
@@ -115,8 +143,8 @@ export default function App() {
           open={manageOpen}
           found={foundProtocols}
           onClose={() => setManageOpen(false)}
-          onRemove={() => setManageOpen(false)}
-          onReinstall={() => setManageOpen(false)}
+          onRemove={(protocols) => void handleRemove(protocols)}
+          onReinstall={(protocols) => void handleReinstall(protocols)}
         />
       )}
 

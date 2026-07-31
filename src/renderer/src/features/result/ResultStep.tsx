@@ -22,6 +22,8 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
   const [copiedAll, setCopiedAll] = useState(false);
   const [noPin, setNoPin] = useState<Set<ProtocolId>>(new Set());
   const succeeded = result.outcomes.filter((o) => o.ok && o.link);
+  // Removal/reinstall-without-a-fresh-link outcomes: ok, but nothing to show a KeyCard for.
+  const succeededWithoutLink = result.outcomes.filter((o) => o.ok && !o.link);
 
   const allLinksText = succeeded.map((o) => o.link).join('\n');
 
@@ -49,7 +51,9 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
       <div>
         <h3 className="split-h">Готово</h3>
         <p className="field-hint" style={{ marginTop: 6 }}>
-          Ссылки показываются один раз, приложение их не хранит.
+          {succeeded.length > 0
+            ? 'Ссылки показываются один раз, приложение их не хранит.'
+            : 'Результат операции ниже.'}
         </p>
       </div>
 
@@ -77,6 +81,12 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
           />
         );
       })}
+
+      {succeededWithoutLink.length > 0 && (
+        <Alert tone="info" title="Удалено">
+          {succeededWithoutLink.map((o) => PROTOCOL_TITLE[o.protocol]).join(', ')}
+        </Alert>
+      )}
 
       {result.outcomes
         .filter((o) => !o.ok)
