@@ -118,10 +118,7 @@ export class XrayRealityInstaller extends BaseInstaller {
   // X1: base packages, needed once per run regardless of protocol count -
   // safe to repeat, apt-get install is idempotent for already-present packages.
   protected async prepare(): Promise<void> {
-    await this.runner.runPrivileged('DEBIAN_FRONTEND=noninteractive apt-get update -qq');
-    await this.runner.runPrivileged(
-      'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates unzip',
-    );
+    await this.installAptPackages(['curl', 'ca-certificates', 'unzip']);
   }
 
   // X2: official install script, retried 3x with backoff since it downloads over the network.

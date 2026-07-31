@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildVlessLink } from '../../src/main/domain/LinkBuilder';
+import {
+  buildHysteria2AcmeLink,
+  buildHysteria2SelfSignedLink,
+  buildVlessLink,
+} from '../../src/main/domain/LinkBuilder';
 
 describe('buildVlessLink', () => {
   it('matches the exact format from tech.md 5.9', () => {
@@ -41,5 +45,46 @@ describe('buildVlessLink', () => {
       shortId: 'sid',
     };
     expect(buildVlessLink(params)).toBe(buildVlessLink(params));
+  });
+});
+
+describe('buildHysteria2SelfSignedLink', () => {
+  const params = {
+    password: 'p@ss/word',
+    host: '203.0.113.7',
+    sni: 'bing.com',
+    fingerprintSha256: '123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0',
+  };
+
+  it('matches the exact format from tech.md 5.9, pin included by default', () => {
+    const link = buildHysteria2SelfSignedLink(params);
+    expect(link).toBe(
+      'hy2://p%40ss%2Fword@203.0.113.7:443?' +
+        'sni=bing.com&insecure=1&pinSHA256=123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0' +
+        '#Uplink-HY2',
+    );
+  });
+
+  it('drops pinSHA256 when includePin is false, for the "link without pin" fallback', () => {
+    const link = buildHysteria2SelfSignedLink(params, false);
+    expect(link).toBe('hy2://p%40ss%2Fword@203.0.113.7:443?sni=bing.com&insecure=1#Uplink-HY2');
+    expect(link).not.toContain('pinSHA256');
+  });
+
+  it('percent-encodes the password as the user-info component', () => {
+    const link = buildHysteria2SelfSignedLink({ ...params, password: 'a b/c' });
+    expect(link).toContain('hy2://a%20b%2Fc@');
+  });
+});
+
+describe('buildHysteria2AcmeLink', () => {
+  it('matches the exact format from tech.md 5.9: trusted cert, no pin', () => {
+    const link = buildHysteria2AcmeLink({ password: 'secret', domain: 'vpn.example.com' });
+    expect(link).toBe('hy2://secret@vpn.example.com:443?sni=vpn.example.com&insecure=0#Uplink-HY2');
+  });
+
+  it('percent-encodes the password', () => {
+    const link = buildHysteria2AcmeLink({ password: 'a b', domain: 'vpn.example.com' });
+    expect(link).toContain('hy2://a%20b@');
   });
 });

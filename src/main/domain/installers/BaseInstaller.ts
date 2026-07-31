@@ -7,19 +7,29 @@ import { InstallerError } from './InstallerError';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+function toStep(spec: StepSpec, run: () => Promise<void>): Step {
+  return { id: spec.id, title: spec.title, weight: spec.weight, critical: true, run };
+}
+
 export interface StepSpec {
   id: StepId;
   title: string;
   weight: number;
 }
 
-/** Per-phase StepId/title/weight metadata (tech.md 5.11 weight table), one entry per fixed template phase. */
+/**
+ * Per-phase StepId/title/weight metadata (tech.md 5.11 weight table), one
+ * entry per fixed template phase. `validate` is nullable: Hysteria2 has no
+ * dry-run config check (tech.md 5.7's StepId list has no hy2 equivalent of
+ * `xray-validate`), so its validate() work is folded into the writeConfig
+ * step instead of getting its own StepView entry.
+ */
 export interface InstallerStepSpecs {
   prepare: StepSpec;
   installCore: StepSpec;
   generateSecrets: StepSpec;
   writeConfig: StepSpec;
-  validate: StepSpec;
+  validate: StepSpec | null;
   start: StepSpec;
   verify: StepSpec;
 }
@@ -87,27 +97,39 @@ export abstract class BaseInstaller {
    * subclass - only the id/title/weight per phase is subclass-supplied.
    */
   buildSteps(): Step[] {
-    const phases: Array<[StepSpec, () => Promise<void>]> = [
-      [this.stepSpecs.prepare, () => this.prepare()],
-      [this.stepSpecs.installCore, () => this.installCore()],
-      [this.stepSpecs.generateSecrets, () => this.generateSecrets()],
-      [this.stepSpecs.writeConfig, () => this.writeConfig()],
-      [this.stepSpecs.validate, () => this.validate()],
-      [this.stepSpecs.start, () => this.start()],
-      [this.stepSpecs.verify, () => this.verify()],
-    ];
-    return phases.map(([spec, run]) => ({
-      id: spec.id,
-      title: spec.title,
-      weight: spec.weight,
+    const validateSpec = this.stepSpecs.validate;
+
+    const configStep: Step = {
+      id: this.stepSpecs.writeConfig.id,
+      title: this.stepSpecs.writeConfig.title,
+      weight: this.stepSpecs.writeConfig.weight,
       critical: true,
-      run,
-    }));
+      run: async () => {
+        await this.writeConfig();
+        if (!validateSpec) await this.validate();
+      },
+    };
+
+    const steps: Step[] = [
+      toStep(this.stepSpecs.prepare, () => this.prepare()),
+      toStep(this.stepSpecs.installCore, () => this.installCore()),
+      toStep(this.stepSpecs.generateSecrets, () => this.generateSecrets()),
+      configStep,
+    ];
+    if (validateSpec) steps.push(toStep(validateSpec, () => this.validate()));
+    steps.push(toStep(this.stepSpecs.start, () => this.start()));
+    steps.push(toStep(this.stepSpecs.verify, () => this.verify()));
+    return steps;
   }
 
   /** The step at which this installer starts writing state to the server - the pipeline's point of no return. */
   getConfigStepId(): StepId {
     return this.stepSpecs.writeConfig.id;
+  }
+
+  /** The last step of this installer's run, used to tell "in progress" from "fully finished" for cancel/rollback attribution across several installers in one run. */
+  getVerifyStepId(): StepId {
+    return this.stepSpecs.verify.id;
   }
 
   /** True if `stepId` belongs to this installer's own buildSteps(), used to attribute a Pipeline failure to a protocol. */
@@ -122,6 +144,18 @@ export abstract class BaseInstaller {
 
   protected warn(message: string): void {
     this.warnings.push(message);
+  }
+
+  /**
+   * `apt-get update` + `install` for a fixed package list (tech.md 10.2:
+   * "apt-get install вызывается из одного места") - both installers call
+   * this instead of hand-rolling the same two-line invocation.
+   */
+  protected async installAptPackages(packages: string[]): Promise<void> {
+    await this.runner.runPrivileged('DEBIAN_FRONTEND=noninteractive apt-get update -qq');
+    await this.runner.runPrivileged(
+      `DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ${packages.map(shellQuote).join(' ')}`,
+    );
   }
 
   /**
