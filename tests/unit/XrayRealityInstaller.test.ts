@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { DeployParams } from '@shared/types';
 import {
   XRAY_CONFIG_PATH,
   XRAY_INSTALL_SCRIPT,
@@ -8,6 +9,14 @@ import { CommandRunnerError } from '../../src/main/ssh/CommandRunner';
 import { FakeCommandRunner } from '../fakes/FakeCommandRunner';
 import { FakeFileTransfer } from '../fakes/FakeFileTransfer';
 
+/** The exact certificate-size probe from tech.md 5.6 X4, as the installer builds it. */
+function certChainCmd(host: string): string {
+  return (
+    `echo | openssl s_client -connect '${host}':443 -servername '${host}' -showcerts 2>/dev/null` +
+    ` | awk '/BEGIN CERT/,/END CERT/' | wc -c`
+  );
+}
+
 function makeHappyRunner(): FakeCommandRunner {
   const runner = new FakeCommandRunner();
   runner.setDefault({ code: 0 });
@@ -16,7 +25,8 @@ function makeHappyRunner(): FakeCommandRunner {
     stdout: 'PrivateKey: priv123\nPassword: pub456\nHash32: hash789\n',
   });
   runner.script("od -An -tx1 -N8 /dev/urandom | tr -d ' \\n'", { stdout: 'a1b2c3d4e5f60718' });
-  runner.script("xray tls ping 'www.microsoft.com'", { code: 0 });
+  runner.script("xray tls ping 'www.cloudflare.com'", { code: 0 });
+  runner.script(certChainCmd('www.cloudflare.com'), { stdout: '3540\n' });
   runner.script('systemctl is-active xray', { stdout: 'active\n' });
   // `ss -tulnp`, not `-tlnp`: a single-protocol query drops the Netid
   // column, confirmed against a real server - this fixture mirrors the
@@ -31,8 +41,20 @@ function makeHappyRunner(): FakeCommandRunner {
   return runner;
 }
 
-function install(runner: FakeCommandRunner, fileTransfer = new FakeFileTransfer()) {
-  const installer = new XrayRealityInstaller(runner, fileTransfer, '203.0.113.10', [0, 0, 0], 1, 5);
+function install(
+  runner: FakeCommandRunner,
+  fileTransfer = new FakeFileTransfer(),
+  params?: DeployParams,
+) {
+  const installer = new XrayRealityInstaller(
+    runner,
+    fileTransfer,
+    '203.0.113.10',
+    params,
+    [0, 0, 0],
+    1,
+    5,
+  );
   return { installer, fileTransfer, outcome: installer.install() };
 }
 
@@ -48,7 +70,7 @@ describe('XrayRealityInstaller - happy path', () => {
       link:
         'vless://8f2c41ba-7d3e-4c9a-b1f0-2e5d8a6c4b90@203.0.113.10:443?' +
         'type=tcp&security=reality&encryption=none&flow=xtls-rprx-vision&' +
-        'sni=www.microsoft.com&fp=chrome&pbk=pub456&sid=a1b2c3d4e5f60718&spx=%2F#Uplink-VLESS',
+        'sni=www.cloudflare.com&fp=chrome&pbk=pub456&sid=a1b2c3d4e5f60718&spx=%2F#Uplink-VLESS',
     });
 
     expect(fileTransfer.writes).toHaveLength(1);
@@ -64,7 +86,7 @@ describe('XrayRealityInstaller - happy path', () => {
     if (!inbound) throw new Error('expected an inbound');
     expect(inbound.settings.clients[0]?.id).toBe('8f2c41ba-7d3e-4c9a-b1f0-2e5d8a6c4b90');
     expect(inbound.streamSettings.realitySettings.privateKey).toBe('priv123');
-    expect(inbound.streamSettings.realitySettings.serverNames).toEqual(['www.microsoft.com']);
+    expect(inbound.streamSettings.realitySettings.serverNames).toEqual(['www.cloudflare.com']);
 
     expect(runner.calls).toContain('systemctl daemon-reload');
     expect(runner.calls).toContain('systemctl enable xray');
@@ -76,14 +98,65 @@ describe('XrayRealityInstaller - happy path', () => {
 
   it('falls through to the second donor when the first fails tls ping', async () => {
     const runner = makeHappyRunner();
-    runner.script("xray tls ping 'www.microsoft.com'", { code: 1 });
+    runner.script("xray tls ping 'www.cloudflare.com'", { code: 1 });
     runner.script("xray tls ping 'www.swift.com'", { code: 0 });
+    runner.script(certChainCmd('www.swift.com'), { stdout: '4127\n' });
 
     const { outcome } = install(runner);
     const result = await outcome;
 
     expect(result.ok).toBe(true);
     expect(result.link).toContain('sni=www.swift.com');
+  });
+
+  it('skips a donor whose certificate chain is too large for REALITY to relay', async () => {
+    const runner = makeHappyRunner();
+    // Passes tls ping like the real www.microsoft.com did, but its chain
+    // exceeds the limit - the exact failure that shipped a server which
+    // listened on 443 and carried no traffic.
+    runner.script(certChainCmd('www.cloudflare.com'), { stdout: '8126\n' });
+    runner.script("xray tls ping 'www.swift.com'", { code: 0 });
+    runner.script(certChainCmd('www.swift.com'), { stdout: '4127\n' });
+
+    const { installer, outcome } = install(runner);
+    const result = await outcome;
+
+    expect(result.ok).toBe(true);
+    expect(result.link).toContain('sni=www.swift.com');
+    expect(installer.getWarnings().some((w) => w.includes('8126'))).toBe(true);
+  });
+
+  it('uses a user-supplied SNI instead of the built-in list, after checking it', async () => {
+    const runner = makeHappyRunner();
+    runner.script("xray tls ping 'my.donor.example'", { code: 0 });
+    runner.script(certChainCmd('my.donor.example'), { stdout: '3000\n' });
+
+    const { outcome } = install(runner, new FakeFileTransfer(), {
+      distroHint: 'auto',
+      tlsMode: 'self-signed',
+      realitySni: 'my.donor.example',
+    });
+    const result = await outcome;
+
+    expect(result.ok).toBe(true);
+    expect(result.link).toContain('sni=my.donor.example');
+    // The built-in candidates are not consulted at all when one is supplied.
+    expect(runner.calls).not.toContain("xray tls ping 'www.cloudflare.com'");
+  });
+
+  it('fails with E_NO_REALITY_DONOR when a user-supplied SNI does not pass the checks', async () => {
+    const runner = makeHappyRunner();
+    runner.script("xray tls ping 'bad.donor.example'", { code: 1 });
+
+    const { outcome } = install(runner, new FakeFileTransfer(), {
+      distroHint: 'auto',
+      tlsMode: 'self-signed',
+      realitySni: 'bad.donor.example',
+    });
+    const result = await outcome;
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.code).toBe('E_NO_REALITY_DONOR');
   });
 
   it('warns instead of failing when ufw is not present', async () => {
@@ -112,9 +185,9 @@ describe('XrayRealityInstaller - error paths', () => {
 
   it('returns E_NO_REALITY_DONOR when every built-in donor fails tls ping', async () => {
     const runner = makeHappyRunner();
-    runner.script("xray tls ping 'www.microsoft.com'", { code: 1 });
-    runner.script("xray tls ping 'www.swift.com'", { code: 1 });
     runner.script("xray tls ping 'www.cloudflare.com'", { code: 1 });
+    runner.script("xray tls ping 'www.swift.com'", { code: 1 });
+    runner.script("xray tls ping 'www.apple.com'", { code: 1 });
 
     const { outcome } = install(runner);
     const result = await outcome;

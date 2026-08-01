@@ -1,9 +1,9 @@
-import type { ProtocolId } from '@shared/types';
+import type { DeployParams, ProtocolId } from '@shared/types';
 import { shellQuote } from '../../security/shellQuote';
 import type { ICommandRunner, IFileTransfer } from '../../ssh/types';
 import { parseX25519Output } from '../parsers/x25519';
 import { buildVlessLink } from '../LinkBuilder';
-import { REALITY_DONORS } from '../RealityDonors';
+import { MAX_DONOR_CERT_BYTES, REALITY_DONORS } from '../RealityDonors';
 import { BaseInstaller } from './BaseInstaller';
 import type { InstallerStepSpecs } from './BaseInstaller';
 import { InstallerError } from './InstallerError';
@@ -110,6 +110,8 @@ export class XrayRealityInstaller extends BaseInstaller {
     runner: ICommandRunner,
     fileTransfer: IFileTransfer,
     host: string,
+    /** Optional: only `realitySni` is read here, to override the built-in donor list (tech.md 5.6 X4). */
+    private readonly params?: DeployParams,
     private readonly downloadRetryDelaysMs: number[] = DOWNLOAD_RETRY_DELAYS_MS,
     private readonly verifyPollIntervalMs = VERIFY_POLL_INTERVAL_MS,
     private readonly serviceStartMaxWaitMs = SERVICE_START_MAX_WAIT_MS,
@@ -157,22 +159,64 @@ export class XrayRealityInstaller extends BaseInstaller {
     this.sni = await this.selectDonor();
   }
 
-  // X4: first built-in donor whose TLS 1.3/HTTP2 handshake xray itself accepts.
-  // No documented text format exists for `xray tls ping` output anywhere in
-  // this repo or upstream docs, so exit code is treated as the pass/fail
-  // signal - consistent with every other check in this codebase (test -x,
-  // systemctl is-active, ...), none of which parse free-text either.
+  // X4: first candidate that passes both donor checks. A user-supplied SNI
+  // replaces the built-in list but is not taken on trust - it runs the same
+  // checks, so a bad choice fails loudly here instead of silently producing
+  // a server that listens but carries no traffic.
   private async selectDonor(): Promise<string> {
-    for (const candidate of REALITY_DONORS) {
-      const result = await this.runner.run(`xray tls ping ${shellQuote(candidate)}`, {
-        timeoutMs: 30_000,
-      });
-      if (result.code === 0) return candidate;
+    const candidates = this.params?.realitySni ? [this.params.realitySni] : REALITY_DONORS;
+    for (const candidate of candidates) {
+      if (await this.isUsableDonor(candidate)) return candidate;
     }
     throw new InstallerError(
       'E_NO_REALITY_DONOR',
-      'no built-in reality donor passed xray tls ping',
+      this.params?.realitySni
+        ? `donor ${this.params.realitySni} failed the TLS 1.3 / certificate size checks`
+        : 'no built-in reality donor passed the TLS 1.3 / certificate size checks',
     );
+  }
+
+  /**
+   * Both donor checks from tech.md 5.6 X4. `xray tls ping` alone is not
+   * enough: it passes for donors whose certificate chain is too large for
+   * REALITY to relay, which breaks the tunnel only *after* the client
+   * authenticates. Exit code is the pass/fail signal for the ping because no
+   * documented output format exists for it - consistent with the rest of
+   * this codebase, which never parses free text from a tool.
+   */
+  private async isUsableDonor(candidate: string): Promise<boolean> {
+    const ping = await this.runner.run(`xray tls ping ${shellQuote(candidate)}`, {
+      timeoutMs: 30_000,
+    });
+    if (ping.code !== 0) return false;
+
+    const certBytes = await this.donorCertChainBytes(candidate);
+    if (certBytes === null) {
+      // openssl missing or unreachable: prefer a possibly-working donor over
+      // failing the whole install on a check we could not run.
+      this.warn(`не удалось измерить цепочку сертификатов ${candidate}, проверка пропущена`);
+      return true;
+    }
+    if (certBytes > MAX_DONOR_CERT_BYTES) {
+      this.warn(
+        `донор ${candidate} пропущен: цепочка сертификатов ${certBytes} Б превышает лимит ${MAX_DONOR_CERT_BYTES} Б`,
+      );
+      return false;
+    }
+    return true;
+  }
+
+  /** PEM byte count of the donor's certificate chain, or null if it could not be measured. */
+  private async donorCertChainBytes(candidate: string): Promise<number | null> {
+    const quoted = shellQuote(candidate);
+    const result = await this.runner.run(
+      `echo | openssl s_client -connect ${quoted}:443 -servername ${quoted} -showcerts 2>/dev/null` +
+        ` | awk '/BEGIN CERT/,/END CERT/' | wc -c`,
+      { timeoutMs: 30_000 },
+    );
+    if (result.code !== 0) return null;
+    const bytes = Number(result.stdout.trim());
+    return Number.isFinite(bytes) && bytes > 0 ? bytes : null;
   }
 
   // X5: back up any existing config, then write the new one atomically via install(1).
