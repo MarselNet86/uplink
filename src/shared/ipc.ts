@@ -7,6 +7,14 @@ export const IPC = {
   PROTOCOLS_REMOVE: 'protocols:remove',
   SESSION_CLOSE: 'session:close',
   HOSTKEY_CONFIRM: 'hostkey:confirm',
+  /** Re-runs protocol detection on a live session, so the select step can refresh after a run (v4). */
+  PROTOCOLS_REFRESH: 'protocols:refresh',
+  /**
+   * Copies text via Electron's main-process clipboard (v4). The renderer is
+   * sandboxed and loads from file://, where navigator.clipboard is not
+   * reliably available, so copying goes through main instead.
+   */
+  CLIPBOARD_WRITE: 'clipboard:write',
   // main -> renderer, send
   PROGRESS_EVENT: 'progress:event',
   HOSTKEY_PROMPT: 'hostkey:prompt',

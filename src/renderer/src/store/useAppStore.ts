@@ -1,5 +1,12 @@
 import { create } from 'zustand';
-import type { AppError, CheckResult, DeployParams, RunResult, StepView } from '@shared/types';
+import type {
+  AppError,
+  CheckResult,
+  DeployParams,
+  ProtocolStatus,
+  RunResult,
+  StepView,
+} from '@shared/types';
 
 export type RouteId = 'wizard' | 'kitchen-sink';
 
@@ -26,6 +33,8 @@ interface AppState {
   setFatalError: (fatal: FatalError | null) => void;
   checkResult: CheckResult | null;
   setCheckResult: (result: CheckResult | null) => void;
+  /** Replaces just the detected protocols, keeping the session/distro/preflight from ssh:check. */
+  setProtocols: (protocols: ProtocolStatus[]) => void;
   deployParams: DeployParams | null;
   setDeployParams: (params: DeployParams | null) => void;
   run: RunState | null;
@@ -44,6 +53,10 @@ export const useAppStore = create<AppState>((set) => ({
   setFatalError: (fatalError) => set({ fatalError }),
   checkResult: null,
   setCheckResult: (checkResult) => set({ checkResult }),
+  setProtocols: (protocols) =>
+    set((state) =>
+      state.checkResult ? { checkResult: { ...state.checkResult, protocols } } : state,
+    ),
   deployParams: null,
   setDeployParams: (deployParams) => set({ deployParams }),
   run: null,

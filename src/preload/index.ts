@@ -8,6 +8,7 @@ import type {
   CheckResult,
   InstallRequest,
   ProgressEvent,
+  ProtocolStatus,
   RemoveRequest,
   RunHandle,
 } from '@shared/types';
@@ -81,6 +82,11 @@ const api = {
 
   saveTextFile: (payload: SaveTextFileRequest): Promise<{ saved: boolean }> =>
     ipcRenderer.invoke(FILE_IPC.SAVE_TEXT_FILE, payload),
+
+  protocolsRefresh: (sessionId: string): Promise<ProtocolStatus[]> =>
+    invokeChecked(IPC.PROTOCOLS_REFRESH, { sessionId }),
+
+  copyText: (text: string): Promise<void> => ipcRenderer.invoke(IPC.CLIPBOARD_WRITE, { text }),
 };
 
 export type UplinkApi = typeof api;

@@ -18,12 +18,23 @@ export const serverCredentialsSchema = z.object({
 
 export const tlsModeSchema = z.union([z.literal('self-signed'), z.literal('acme-domain')]);
 
+/** Hostname shape shared by the domain field and both optional SNI overrides. */
+const hostnameSchema = z
+  .string()
+  .min(1)
+  .max(253)
+  .regex(/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/, {
+    message: 'должно быть доменным именем, например www.cloudflare.com',
+  });
+
 export const deployParamsSchema = z
   .object({
     distroHint: z.union([distroIdSchema, z.literal('auto')]),
     tlsMode: tlsModeSchema,
     domain: z.string().min(1).optional(),
     acmeEmail: z.string().email().optional(),
+    realitySni: hostnameSchema.optional(),
+    hysteriaSni: hostnameSchema.optional(),
   })
   .refine((v) => v.tlsMode !== 'acme-domain' || (!!v.domain && !!v.acmeEmail), {
     message: 'domain and acmeEmail are required when tlsMode is acme-domain',
@@ -138,6 +149,15 @@ export const installCancelRequestSchema = z.object({
 
 export const sessionCloseRequestSchema = z.object({
   sessionId: z.string().min(1),
+});
+
+export const protocolsRefreshRequestSchema = z.object({
+  sessionId: z.string().min(1),
+});
+
+/** Bounded so a runaway renderer cannot push unlimited data into the OS clipboard. */
+export const clipboardWriteRequestSchema = z.object({
+  text: z.string().max(100_000),
 });
 
 export const hostkeyConfirmRequestSchema = z.object({

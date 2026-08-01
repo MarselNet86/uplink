@@ -16,6 +16,7 @@ export default function App() {
   const setRoute = useAppStore((state) => state.setRoute);
   const checkResult = useAppStore((state) => state.checkResult);
   const setCheckResult = useAppStore((state) => state.setCheckResult);
+  const setProtocols = useAppStore((state) => state.setProtocols);
   const deployParams = useAppStore((state) => state.deployParams);
   const setDeployParams = useAppStore((state) => state.setDeployParams);
   const run = useAppStore((state) => state.run);
@@ -95,10 +96,24 @@ export default function App() {
     }
   };
 
-  const handleDone = () => {
-    resetRun();
-    setCheckResult(null);
-    setDeployParams(null);
+  /**
+   * Returns to protocol selection rather than the credentials form: the SSH
+   * session is still open, so the only thing actually stale after a run is
+   * the detected protocol list, which is refetched over that same session.
+   * Falls back to step 1 only if the session is gone, since that is the one
+   * case where re-entering credentials is genuinely required.
+   */
+  const handleDone = async () => {
+    if (!checkResult) return;
+    try {
+      const protocols = await window.uplink.protocolsRefresh(checkResult.sessionId);
+      setProtocols(protocols);
+      resetRun();
+    } catch {
+      resetRun();
+      setCheckResult(null);
+      setDeployParams(null);
+    }
   };
 
   const step = !checkResult ? 1 : !run ? 2 : !run.result ? 3 : 4;
@@ -138,7 +153,9 @@ export default function App() {
             />
           )}
           {step === 3 && <InstallStep />}
-          {step === 4 && run?.result && <ResultStep result={run.result} onDone={handleDone} />}
+          {step === 4 && run?.result && (
+            <ResultStep result={run.result} onDone={() => void handleDone()} />
+          )}
         </WizardShell>
       )}
 

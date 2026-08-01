@@ -15,9 +15,31 @@ export interface ResultStepProps {
   onDone: () => void;
 }
 
-/** Removes `&pinSHA256=...` for the "link without pin" fallback (tech.md 5.9) - clients on some builds fail to parse a hy2 link that includes the pin. */
+/**
+ * Drops one query parameter from a link, keeping the rest intact. Both hy2
+ * fallbacks below are subtractive, so this is all the surgery they need.
+ */
+function stripParam(link: string, name: string): string {
+  return link.replace(new RegExp(`[?&]${name}=[^&#]*`), (match) =>
+    match.startsWith('?') ? '?' : '',
+  );
+}
+
+/** "Link without pin" fallback (tech.md 5.9): some client builds fail to parse a hy2 link carrying pinSHA256. */
 function stripPinSha256(link: string): string {
-  return link.replace(/[?&]pinSHA256=[^&#]*/, '');
+  return stripParam(link, 'pinSHA256');
+}
+
+/**
+ * "Link without insecure" fallback. Newer XrayCore-based clients removed
+ * `allowInsecure` outright - they refuse a link carrying `insecure=1` with
+ * "the feature allow-Insecure has been removed and migrated to
+ * pinnedPeerCertSha256". Dropping it is safe precisely because the pin is
+ * already there: the client still verifies the certificate, by fingerprint
+ * instead of by trust chain.
+ */
+function stripInsecure(link: string): string {
+  return stripParam(link, 'insecure');
 }
 
 /**
@@ -47,6 +69,7 @@ function buildDiagnosticsReport(result: RunResult): string {
 export function ResultStep({ result, onDone }: ResultStepProps) {
   const [copiedAll, setCopiedAll] = useState(false);
   const [noPin, setNoPin] = useState<Set<ProtocolId>>(new Set());
+  const [noInsecure, setNoInsecure] = useState<Set<ProtocolId>>(new Set());
   const succeeded = result.outcomes.filter((o) => o.ok && o.link);
   // Removal/reinstall-without-a-fresh-link outcomes: ok, but nothing to show a KeyCard for.
   const succeededWithoutLink = result.outcomes.filter((o) => o.ok && !o.link);
@@ -60,7 +83,7 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
   const allLinksText = succeeded.map((o) => o.link).join('\n');
 
   const copyAll = async () => {
-    await navigator.clipboard.writeText(allLinksText);
+    await window.uplink.copyText(allLinksText);
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
   };
@@ -69,14 +92,16 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
     await window.uplink.saveTextFile({ suggestedName: 'uplink-keys.txt', content: allLinksText });
   };
 
-  const togglePin = (protocol: ProtocolId, withoutPin: boolean) => {
-    setNoPin((prev) => {
+  const toggleIn = (setter: typeof setNoPin) => (protocol: ProtocolId, enabled: boolean) => {
+    setter((prev) => {
       const next = new Set(prev);
-      if (withoutPin) next.add(protocol);
+      if (enabled) next.add(protocol);
       else next.delete(protocol);
       return next;
     });
   };
+  const togglePin = toggleIn(setNoPin);
+  const toggleInsecure = toggleIn(setNoInsecure);
 
   return (
     <>
@@ -92,8 +117,10 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
       {succeeded.map((outcome) => {
         if (!outcome.link) return null;
         const hasPin = outcome.link.includes('pinSHA256=');
-        const link =
-          hasPin && noPin.has(outcome.protocol) ? stripPinSha256(outcome.link) : outcome.link;
+        const hasInsecure = outcome.link.includes('insecure=1');
+        let link = outcome.link;
+        if (hasPin && noPin.has(outcome.protocol)) link = stripPinSha256(link);
+        if (hasInsecure && noInsecure.has(outcome.protocol)) link = stripInsecure(link);
         return (
           <KeyCard
             key={outcome.protocol}
@@ -101,13 +128,25 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
             port={PROTOCOL_PORT[outcome.protocol]}
             link={link}
             footerExtra={
-              hasPin ? (
-                <Checkbox
-                  checked={noPin.has(outcome.protocol)}
-                  onCheckedChange={(checked) => togglePin(outcome.protocol, checked)}
-                  label="Ссылка без пина"
-                  description="Для клиентов, у которых ломается pinSHA256"
-                />
+              hasPin || hasInsecure ? (
+                <>
+                  {hasInsecure && (
+                    <Checkbox
+                      checked={noInsecure.has(outcome.protocol)}
+                      onCheckedChange={(checked) => toggleInsecure(outcome.protocol, checked)}
+                      label="Ссылка без insecure"
+                      description="Если клиент пишет, что allow-Insecure удалён и заменён на pinnedPeerCertSha256"
+                    />
+                  )}
+                  {hasPin && (
+                    <Checkbox
+                      checked={noPin.has(outcome.protocol)}
+                      onCheckedChange={(checked) => togglePin(outcome.protocol, checked)}
+                      label="Ссылка без пина"
+                      description="Для клиентов, у которых ломается pinSHA256"
+                    />
+                  )}
+                </>
               ) : undefined
             }
           />
