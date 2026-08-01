@@ -29,7 +29,13 @@ export async function generateSelfSignedCert(
     `openssl req -new -x509 -days ${CERT_DAYS} -key ${shellQuote(KEY_PATH)} ` +
       `-out ${shellQuote(CERT_PATH)} -subj ${shellQuote(`/CN=${commonName}`)}`,
   );
+  // Generated as root over the exec channel, but hysteria-server.service
+  // reads these as its own `hysteria` user (same hazard as the config file
+  // in Hysteria2Installer.writeConfig) - chmod alone leaves them unreadable.
   await runner.runPrivileged(`chmod 600 ${shellQuote(KEY_PATH)} ${shellQuote(CERT_PATH)}`);
+  await runner.runPrivileged(
+    `chown hysteria:hysteria ${shellQuote(KEY_PATH)} ${shellQuote(CERT_PATH)}`,
+  );
 
   const fingerprintResult = await runner.runPrivileged(
     `openssl x509 -noout -fingerprint -sha256 -in ${shellQuote(CERT_PATH)}`,

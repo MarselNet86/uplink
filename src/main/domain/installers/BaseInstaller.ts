@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { AppError, ProtocolId, ProtocolOutcome, StepId } from '@shared/types';
 import { shellQuote } from '../../security/shellQuote';
 import type { Step } from '../../pipeline/Step';
+import { CommandRunnerError } from '../../ssh/CommandRunner';
 import type { ICommandRunner, IFileTransfer } from '../../ssh/types';
 import { InstallerError } from './InstallerError';
 
@@ -176,19 +177,28 @@ export abstract class BaseInstaller {
   /**
    * Safe privileged config write (tech.md 5.3): SFTP can only write where
    * the SSH login user already has permission, so content goes to a temp
-   * file first, then `install -m ... -o root -g root` moves it into place
-   * with the right owner/mode - never a raw SFTP write to a root-owned path.
+   * file first, then `install -m ... -o <owner>` moves it into place with
+   * the right owner/mode - never a raw SFTP write to a root-owned path.
+   *
+   * `owner` defaults to root:root, but the official install scripts drop
+   * both services' privileges before they ever read this file (Xray to
+   * `nobody`, Hysteria2 to its own `hysteria` user - tech.md 5.6 X2 already
+   * flags this as "important for config permissions"), so a config that's
+   * `0600 root:root` is unreadable by the very process meant to read it and
+   * the service fails to start with a permission error, not a config error.
+   * Callers writing a service config must pass that service's actual user.
    */
   protected async writePrivilegedFile(
     destPath: string,
     content: string,
     mode: number,
+    owner: { user: string; group: string } = { user: 'root', group: 'root' },
   ): Promise<void> {
     const tmpPath = `/tmp/uplink-${randomUUID()}`;
     await this.fileTransfer.writeFile(tmpPath, content, 0o600);
     const octalMode = mode.toString(8).padStart(3, '0');
     const install = await this.runner.runPrivileged(
-      `install -m ${octalMode} -o root -g root ${shellQuote(tmpPath)} ${shellQuote(destPath)}`,
+      `install -m ${octalMode} -o ${shellQuote(owner.user)} -g ${shellQuote(owner.group)} ${shellQuote(tmpPath)} ${shellQuote(destPath)}`,
     );
     await this.runner.run(`rm -f ${shellQuote(tmpPath)}`);
     if (install.code !== 0) {
@@ -234,6 +244,10 @@ export abstract class BaseInstaller {
   /** Maps a caught phase error to the frozen AppError shape (tech.md section 8). */
   toAppError(err: unknown): AppError {
     if (err instanceof InstallerError) return { code: err.code, message: err.message };
+    // CommandRunner throws its own typed error for sudo/timeout failures
+    // (E_NO_SUDO, E_TIMEOUT) - without this check those collapse into an
+    // unhelpful E_UNKNOWN and the real cause never reaches the user.
+    if (err instanceof CommandRunnerError) return { code: err.code, message: err.message };
     return {
       code: 'E_UNKNOWN',
       message: err instanceof Error ? err.message : 'unknown installer error',

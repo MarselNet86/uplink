@@ -21,10 +21,12 @@ function makeHappyRunner(): FakeCommandRunner {
     stdout: 'SHA256 Fingerprint=AB:CD:EF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC\n',
   });
   runner.script('systemctl is-active hysteria-server.service', { stdout: 'active\n' });
-  runner.script('ss -ulnp', {
+  // `ss -tulnp`, not `-ulnp`: a single-protocol query drops the Netid
+  // column, confirmed against a real server (same issue as XrayRealityInstaller).
+  runner.script('ss -tulnp', {
     stdout:
       'Netid State Recv-Q Send-Q Local Peer Process\n' +
-      'udp UNCONN 0 0 0.0.0.0:443 0.0.0.0:* users:(("hysteria",pid=1,fd=3))\n',
+      'udp UNCONN 0 0 *:443 *:* users:(("hysteria",pid=1,fd=3))\n',
   });
   runner.script('command -v ufw', { code: 1 });
   return runner;
@@ -176,7 +178,7 @@ describe('Hysteria2Installer - error paths', () => {
 
   it('returns E_SERVICE_FAILED (self-signed) when hysteria never listens on 443/udp', async () => {
     const runner = makeHappyRunner();
-    runner.script('ss -ulnp', { stdout: 'Netid State Recv-Q Send-Q Local Peer Process\n' });
+    runner.script('ss -tulnp', { stdout: 'Netid State Recv-Q Send-Q Local Peer Process\n' });
 
     const { outcome } = install(selfSignedParams, runner);
     const result = await outcome;
@@ -187,7 +189,7 @@ describe('Hysteria2Installer - error paths', () => {
 
   it('returns E_ACME_FAILED when the poll window expires without the service coming up', async () => {
     const runner = makeHappyRunner();
-    runner.script('ss -ulnp', { stdout: 'Netid State Recv-Q Send-Q Local Peer Process\n' });
+    runner.script('ss -tulnp', { stdout: 'Netid State Recv-Q Send-Q Local Peer Process\n' });
 
     const { outcome } = install(acmeParams, runner);
     const result = await outcome;

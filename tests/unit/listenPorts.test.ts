@@ -13,6 +13,11 @@ describe('parseListenPorts', () => {
     expect(entries).toContainEqual({ protocol: 'udp', port: 443, process: 'hysteria' });
   });
 
+  it('parses a `*` wildcard local address (confirmed live: xray with AmbientCapabilities=CAP_NET_BIND_SERVICE binds `*:443`, not `0.0.0.0:443`)', () => {
+    const entries = parseListenPorts(fixture);
+    expect(entries).toContainEqual({ protocol: 'tcp', port: 443, process: 'xray' });
+  });
+
   it('handles IPv6 local addresses', () => {
     const entries = parseListenPorts(fixture);
     expect(entries.filter((e) => e.protocol === 'tcp' && e.port === 22)).toHaveLength(2);
@@ -36,6 +41,6 @@ describe('findListener', () => {
 
   it('returns undefined for a free port', () => {
     const entries = parseListenPorts(fixture);
-    expect(findListener(entries, 'tcp', 443)).toBeUndefined();
+    expect(findListener(entries, 'tcp', 8080)).toBeUndefined();
   });
 });

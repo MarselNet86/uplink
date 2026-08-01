@@ -4,6 +4,7 @@ import {
   XRAY_INSTALL_SCRIPT,
   XrayRealityInstaller,
 } from '../../src/main/domain/installers/XrayRealityInstaller';
+import { CommandRunnerError } from '../../src/main/ssh/CommandRunner';
 import { FakeCommandRunner } from '../fakes/FakeCommandRunner';
 import { FakeFileTransfer } from '../fakes/FakeFileTransfer';
 
@@ -17,10 +18,14 @@ function makeHappyRunner(): FakeCommandRunner {
   runner.script("od -An -tx1 -N8 /dev/urandom | tr -d ' \\n'", { stdout: 'a1b2c3d4e5f60718' });
   runner.script("xray tls ping 'www.microsoft.com'", { code: 0 });
   runner.script('systemctl is-active xray', { stdout: 'active\n' });
-  runner.script('ss -tlnp', {
+  // `ss -tulnp`, not `-tlnp`: a single-protocol query drops the Netid
+  // column, confirmed against a real server - this fixture mirrors the
+  // real dual-protocol output shape, including the `*:443` wildcard
+  // address xray actually binds to under AmbientCapabilities=CAP_NET_BIND_SERVICE.
+  runner.script('ss -tulnp', {
     stdout:
       'Netid State Recv-Q Send-Q Local Peer Process\n' +
-      'tcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:* users:(("xray",pid=1,fd=3))\n',
+      'tcp LISTEN 0 4096 *:443 *:* users:(("xray",pid=1,fd=3))\n',
   });
   runner.script('command -v ufw', { code: 1 });
   return runner;
@@ -116,7 +121,7 @@ describe('XrayRealityInstaller - error paths', () => {
 
   it('returns E_SERVICE_FAILED when xray is active but not listening on 443/tcp', async () => {
     const runner = makeHappyRunner();
-    runner.script('ss -tlnp', { stdout: 'Netid State Recv-Q Send-Q Local Peer Process\n' });
+    runner.script('ss -tulnp', { stdout: 'Netid State Recv-Q Send-Q Local Peer Process\n' });
 
     const { outcome } = install(runner);
     const result = await outcome;
@@ -179,5 +184,18 @@ describe('XrayRealityInstaller - pipeline integration', () => {
     );
     expect(restoreIdx).toBeGreaterThanOrEqual(0);
     expect(runner.calls).toContain('systemctl stop xray');
+  });
+
+  it('toAppError preserves CommandRunnerError codes instead of collapsing them to E_UNKNOWN', () => {
+    const { installer } = install(makeHappyRunner());
+
+    expect(installer.toAppError(new CommandRunnerError('E_TIMEOUT', 'command timed out'))).toEqual({
+      code: 'E_TIMEOUT',
+      message: 'command timed out',
+    });
+    expect(installer.toAppError(new CommandRunnerError('E_NO_SUDO', 'sudo unavailable'))).toEqual({
+      code: 'E_NO_SUDO',
+      message: 'sudo unavailable',
+    });
   });
 });

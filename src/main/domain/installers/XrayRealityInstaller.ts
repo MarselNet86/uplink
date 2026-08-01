@@ -182,7 +182,14 @@ export class XrayRealityInstaller extends BaseInstaller {
       sni: this.sni,
     });
     await this.backupIfExists(XRAY_CONFIG_PATH);
-    await this.writePrivilegedFile(XRAY_CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, 0o600);
+    // The official install script runs xray.service as `nobody` (tech.md
+    // 5.6 X2) - the config must be readable by that user, not just root.
+    await this.writePrivilegedFile(
+      XRAY_CONFIG_PATH,
+      `${JSON.stringify(config, null, 2)}\n`,
+      0o600,
+      { user: 'nobody', group: 'nogroup' },
+    );
   }
 
   // X6: validate before restarting; roll back to .bak on failure, service untouched.
@@ -205,7 +212,11 @@ export class XrayRealityInstaller extends BaseInstaller {
   // X8 (service + port listening) then X9 (firewall, best-effort).
   protected async verify(): Promise<void> {
     const active = await this.runner.run('systemctl is-active xray');
-    const listening = await this.runner.run('ss -tlnp');
+    // `-tulnp` (both protocols), not `-tlnp`: a single-protocol query drops
+    // the Netid column entirely, which parseListenPorts needs to tell tcp
+    // and udp rows apart - confirmed live, `ss -tlnp` alone silently parses
+    // to zero entries.
+    const listening = await this.runner.run('ss -tulnp');
     const entries = parseListenPorts(listening.stdout);
     const xrayListening = findListener(entries, 'tcp', 443)?.process === 'xray';
 

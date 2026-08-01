@@ -170,7 +170,13 @@ export class Hysteria2Installer extends BaseInstaller {
             domain: this.requireDomain(),
             acmeEmail: this.requireAcmeEmail(),
           });
-    await this.writePrivilegedFile(HY2_CONFIG_PATH, yaml, 0o600);
+    // The official install script runs hysteria-server.service as its own
+    // dedicated `hysteria` user (confirmed live: `User=hysteria
+    // Group=hysteria`), not root - same permission hazard as Xray's `nobody`.
+    await this.writePrivilegedFile(HY2_CONFIG_PATH, yaml, 0o600, {
+      user: 'hysteria',
+      group: 'hysteria',
+    });
   }
 
   // H4s: self-signed cert generation, occupies the `validate` phase slot
@@ -224,7 +230,10 @@ export class Hysteria2Installer extends BaseInstaller {
     const deadline = Date.now() + maxWaitMs;
     for (;;) {
       const active = await this.runner.run('systemctl is-active hysteria-server.service');
-      const listening = await this.runner.run('ss -ulnp');
+      // `-tulnp`, not `-ulnp` alone: see the identical note in
+      // XrayRealityInstaller.verify() - a single-protocol ss query has no
+      // Netid column and parseListenPorts can't classify any row from it.
+      const listening = await this.runner.run('ss -tulnp');
       const entries = parseListenPorts(listening.stdout);
       const hy2Listening = findListener(entries, 'udp', 443)?.process === 'hysteria';
       if (parseIsActive(active.stdout) === 'active' && hy2Listening) return true;
