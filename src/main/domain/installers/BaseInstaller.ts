@@ -4,6 +4,8 @@ import { shellQuote } from '../../security/shellQuote';
 import type { Step } from '../../pipeline/Step';
 import { CommandRunnerError } from '../../ssh/CommandRunner';
 import type { ICommandRunner, IFileTransfer } from '../../ssh/types';
+import { findListener, parseListenPorts } from '../parsers/listenPorts';
+import { parseIsActive } from '../parsers/systemctl';
 import { InstallerError } from './InstallerError';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -145,6 +147,53 @@ export abstract class BaseInstaller {
 
   protected warn(message: string): void {
     this.warnings.push(message);
+  }
+
+  /**
+   * Enables a unit at boot and (re)starts it so the config just written is
+   * the one actually loaded (tech.md 10.2 keeps this in one place).
+   *
+   * `restart`, not `enable --now` as tech.md 5.6 X7 originally specified:
+   * confirmed live that the official Xray install script already starts
+   * the service with its stock `{}` config during installCore(), and
+   * `--now` is a no-op for an already-running unit - the freshly written
+   * config was never loaded, the daemon sat there with no inbounds, and
+   * verify() failed with E_SERVICE_FAILED on a "running" service. The same
+   * applies to any reinstall over a live service. `restart` starts a
+   * stopped unit and reloads a running one, so it is correct either way.
+   */
+  protected async enableAndRestartService(unit: string): Promise<void> {
+    await this.runner.runPrivileged('systemctl daemon-reload');
+    await this.runner.runPrivileged(`systemctl enable ${unit}`);
+    await this.runner.runPrivileged(`systemctl restart ${unit}`);
+  }
+
+  /**
+   * Polls until the unit is active AND actually bound to its port, or the
+   * budget runs out. A bounded wait rather than a single check because
+   * `systemctl restart` returns once the process is forked, not once it has
+   * bound the socket - an immediate check races the daemon's own startup.
+   */
+  protected async waitForService(opts: {
+    unit: string;
+    protocol: 'tcp' | 'udp';
+    port: number;
+    processName: string;
+    maxWaitMs: number;
+    pollIntervalMs: number;
+  }): Promise<boolean> {
+    const deadline = Date.now() + opts.maxWaitMs;
+    for (;;) {
+      const active = await this.runner.run(`systemctl is-active ${opts.unit}`);
+      // `-tulnp` (both protocols): a single-protocol ss query omits the
+      // Netid column that parseListenPorts needs to classify rows.
+      const listening = await this.runner.run('ss -tulnp');
+      const entries = parseListenPorts(listening.stdout);
+      const bound = findListener(entries, opts.protocol, opts.port)?.process === opts.processName;
+      if (parseIsActive(active.stdout) === 'active' && bound) return true;
+      if (Date.now() >= deadline) return false;
+      await sleep(opts.pollIntervalMs);
+    }
   }
 
   /**

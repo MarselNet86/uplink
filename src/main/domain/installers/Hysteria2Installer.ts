@@ -3,8 +3,6 @@ import type { DeployParams, ProtocolId } from '@shared/types';
 import type { ICommandRunner, IFileTransfer } from '../../ssh/types';
 import { generateSelfSignedCert } from '../CertGenerator';
 import { HYSTERIA_FAKE_SNI } from '../HysteriaFakeSni';
-import { findListener, parseListenPorts } from '../parsers/listenPorts';
-import { parseIsActive } from '../parsers/systemctl';
 import { buildHysteria2AcmeLink, buildHysteria2SelfSignedLink } from '../LinkBuilder';
 import { BaseInstaller } from './BaseInstaller';
 import type { InstallerStepSpecs } from './BaseInstaller';
@@ -12,6 +10,7 @@ import { InstallerError } from './InstallerError';
 
 export const HY2_CONFIG_PATH = '/etc/hysteria/config.yaml';
 export const HY2_INSTALL_SCRIPT = 'bash -c "$(curl -fsSL https://get.hy2.sh/)"';
+const HY2_SERVICE = 'hysteria-server.service';
 // Trusted, unrelated-to-the-app domain the server pretends to be when it
 // gets a request that isn't the VPN protocol itself (tech.md 5.7): reuses
 // the same host as the self-signed cert's CN, nothing user-controlled ever
@@ -19,10 +18,9 @@ export const HY2_INSTALL_SCRIPT = 'bash -c "$(curl -fsSL https://get.hy2.sh/)"';
 const MASQUERADE_URL = 'https://www.bing.com/';
 const INSTALL_RETRY_DELAYS_MS = [5_000, 15_000, 30_000];
 const INSTALL_TIMEOUT_MS = 600_000;
-const ACME_POLL_INTERVAL_MS = 5_000;
+const VERIFY_POLL_INTERVAL_MS = 5_000;
 const ACME_MAX_WAIT_MS = 180_000;
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const SERVICE_START_MAX_WAIT_MS = 15_000;
 
 function yamlConfig(body: { tlsOrAcme: string; password: string }): string {
   return (
@@ -98,8 +96,9 @@ export class Hysteria2Installer extends BaseInstaller {
     host: string,
     private readonly params: DeployParams,
     private readonly installRetryDelaysMs: number[] = INSTALL_RETRY_DELAYS_MS,
-    private readonly acmePollIntervalMs = ACME_POLL_INTERVAL_MS,
+    private readonly verifyPollIntervalMs = VERIFY_POLL_INTERVAL_MS,
     private readonly acmeMaxWaitMs = ACME_MAX_WAIT_MS,
+    private readonly serviceStartMaxWaitMs = SERVICE_START_MAX_WAIT_MS,
   ) {
     super(runner, fileTransfer, host);
     this.stepSpecs = {
@@ -188,16 +187,24 @@ export class Hysteria2Installer extends BaseInstaller {
     this.fingerprint = cert.fingerprint;
   }
 
-  // H6s/H5a: identical start commands for both branches.
+  // H6s/H5a: identical start for both branches; restart (not enable --now)
+  // so a reinstall over a live service picks up the new config and password.
   protected async start(): Promise<void> {
-    await this.runner.runPrivileged('systemctl daemon-reload');
-    await this.runner.runPrivileged('systemctl enable --now hysteria-server.service');
+    await this.enableAndRestartService(HY2_SERVICE);
   }
 
-  // H6s (immediate) / H5a (poll up to 180s for async ACME issuance) then H6a/H7 firewall.
+  // H6s (short wait for the daemon to bind) / H5a (poll up to 180s for
+  // async ACME issuance) then H6a/H7 firewall.
   protected async verify(): Promise<void> {
     const isAcme = this.params.tlsMode === 'acme-domain';
-    const ok = await this.pollUntilListening(isAcme ? this.acmeMaxWaitMs : 0);
+    const ok = await this.waitForService({
+      unit: HY2_SERVICE,
+      protocol: 'udp',
+      port: 443,
+      processName: 'hysteria',
+      maxWaitMs: isAcme ? this.acmeMaxWaitMs : this.serviceStartMaxWaitMs,
+      pollIntervalMs: this.verifyPollIntervalMs,
+    });
     if (!ok) {
       throw new InstallerError(
         isAcme ? 'E_ACME_FAILED' : 'E_SERVICE_FAILED',
@@ -223,23 +230,7 @@ export class Hysteria2Installer extends BaseInstaller {
   // Only reached if the user cancels after writeConfig has run (tech.md 5.12).
   async rollback(): Promise<void> {
     await this.restoreBackup(HY2_CONFIG_PATH);
-    await this.runner.runPrivileged('systemctl stop hysteria-server.service');
-  }
-
-  private async pollUntilListening(maxWaitMs: number): Promise<boolean> {
-    const deadline = Date.now() + maxWaitMs;
-    for (;;) {
-      const active = await this.runner.run('systemctl is-active hysteria-server.service');
-      // `-tulnp`, not `-ulnp` alone: see the identical note in
-      // XrayRealityInstaller.verify() - a single-protocol ss query has no
-      // Netid column and parseListenPorts can't classify any row from it.
-      const listening = await this.runner.run('ss -tulnp');
-      const entries = parseListenPorts(listening.stdout);
-      const hy2Listening = findListener(entries, 'udp', 443)?.process === 'hysteria';
-      if (parseIsActive(active.stdout) === 'active' && hy2Listening) return true;
-      if (Date.now() >= deadline) return false;
-      await sleep(this.acmePollIntervalMs);
-    }
+    await this.runner.runPrivileged(`systemctl stop ${HY2_SERVICE}`);
   }
 
   private requireDomain(): string {

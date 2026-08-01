@@ -1,8 +1,6 @@
 import type { ProtocolId } from '@shared/types';
 import { shellQuote } from '../../security/shellQuote';
 import type { ICommandRunner, IFileTransfer } from '../../ssh/types';
-import { findListener, parseListenPorts } from '../parsers/listenPorts';
-import { parseIsActive } from '../parsers/systemctl';
 import { parseX25519Output } from '../parsers/x25519';
 import { buildVlessLink } from '../LinkBuilder';
 import { REALITY_DONORS } from '../RealityDonors';
@@ -15,6 +13,8 @@ export const XRAY_INSTALL_SCRIPT =
   'bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install';
 const DOWNLOAD_RETRY_DELAYS_MS = [5_000, 15_000, 30_000];
 const DOWNLOAD_TIMEOUT_MS = 600_000;
+const VERIFY_POLL_INTERVAL_MS = 1_000;
+const SERVICE_START_MAX_WAIT_MS = 15_000;
 
 interface XrayConfig {
   log: { loglevel: string };
@@ -111,6 +111,8 @@ export class XrayRealityInstaller extends BaseInstaller {
     fileTransfer: IFileTransfer,
     host: string,
     private readonly downloadRetryDelaysMs: number[] = DOWNLOAD_RETRY_DELAYS_MS,
+    private readonly verifyPollIntervalMs = VERIFY_POLL_INTERVAL_MS,
+    private readonly serviceStartMaxWaitMs = SERVICE_START_MAX_WAIT_MS,
   ) {
     super(runner, fileTransfer, host);
   }
@@ -203,24 +205,22 @@ export class XrayRealityInstaller extends BaseInstaller {
     }
   }
 
-  // X7: enable and start the service.
+  // X7: enable at boot and restart, so the config written in X5 is the one loaded.
   protected async start(): Promise<void> {
-    await this.runner.runPrivileged('systemctl daemon-reload');
-    await this.runner.runPrivileged('systemctl enable --now xray');
+    await this.enableAndRestartService('xray');
   }
 
   // X8 (service + port listening) then X9 (firewall, best-effort).
   protected async verify(): Promise<void> {
-    const active = await this.runner.run('systemctl is-active xray');
-    // `-tulnp` (both protocols), not `-tlnp`: a single-protocol query drops
-    // the Netid column entirely, which parseListenPorts needs to tell tcp
-    // and udp rows apart - confirmed live, `ss -tlnp` alone silently parses
-    // to zero entries.
-    const listening = await this.runner.run('ss -tulnp');
-    const entries = parseListenPorts(listening.stdout);
-    const xrayListening = findListener(entries, 'tcp', 443)?.process === 'xray';
-
-    if (parseIsActive(active.stdout) !== 'active' || !xrayListening) {
+    const ok = await this.waitForService({
+      unit: 'xray',
+      protocol: 'tcp',
+      port: 443,
+      processName: 'xray',
+      maxWaitMs: this.serviceStartMaxWaitMs,
+      pollIntervalMs: this.verifyPollIntervalMs,
+    });
+    if (!ok) {
       throw new InstallerError(
         'E_SERVICE_FAILED',
         'xray is not active or not listening on 443/tcp',

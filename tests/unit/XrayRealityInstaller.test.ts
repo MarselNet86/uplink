@@ -32,7 +32,7 @@ function makeHappyRunner(): FakeCommandRunner {
 }
 
 function install(runner: FakeCommandRunner, fileTransfer = new FakeFileTransfer()) {
-  const installer = new XrayRealityInstaller(runner, fileTransfer, '203.0.113.10', [0, 0, 0]);
+  const installer = new XrayRealityInstaller(runner, fileTransfer, '203.0.113.10', [0, 0, 0], 1, 5);
   return { installer, fileTransfer, outcome: installer.install() };
 }
 
@@ -67,7 +67,11 @@ describe('XrayRealityInstaller - happy path', () => {
     expect(inbound.streamSettings.realitySettings.serverNames).toEqual(['www.microsoft.com']);
 
     expect(runner.calls).toContain('systemctl daemon-reload');
-    expect(runner.calls).toContain('systemctl enable --now xray');
+    expect(runner.calls).toContain('systemctl enable xray');
+    // restart, not `enable --now`: the install script already started the
+    // service with its stock {} config, so `--now` would be a no-op and the
+    // config written above would never be loaded (confirmed live).
+    expect(runner.calls).toContain('systemctl restart xray');
   });
 
   it('falls through to the second donor when the first fails tls ping', async () => {
@@ -150,7 +154,7 @@ describe('XrayRealityInstaller - error paths', () => {
     expect(restoreIdx).toBeGreaterThan(backupIdx);
 
     // The service is never started when validation failed.
-    expect(runner.calls).not.toContain('systemctl enable --now xray');
+    expect(runner.calls).not.toContain('systemctl restart xray');
   });
 });
 

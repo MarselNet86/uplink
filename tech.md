@@ -421,8 +421,10 @@ xray tls ping <candidate>
 **Шаг X7. Запуск.**
 ```
 systemctl daemon-reload
-systemctl enable --now xray
+systemctl enable xray
+systemctl restart xray
 ```
+Именно `restart`, а не `enable --now`, как было в первой редакции этого шага. Подтверждено вживую: официальный скрипт из X2 сам поднимает сервис со своим дефолтным конфигом `{}` ещё до того, как мы запишем свой в X5, а `--now` для уже запущенного юнита - no-op. В результате демон продолжал работать со стоковым конфигом без инбаундов: `systemctl is-active` показывал `active`, порт 443 не слушал никто, и X8 падал с `E_SERVICE_FAILED` при «успешно работающем» сервисе. `restart` поднимает остановленный юнит и перезагружает запущенный, поэтому корректен в обоих случаях - включая переустановку поверх живого сервиса, где иначе не подхватились бы новые ключи.
 
 **Шаг X8. Верификация.**
 ```
@@ -500,9 +502,12 @@ quic:
 **Шаг H6s. Запуск.**
 ```
 systemctl daemon-reload
-systemctl enable --now hysteria-server.service
+systemctl enable hysteria-server.service
+systemctl restart hysteria-server.service
 ```
-Верификация мгновенная (ACME не ждём):
+`restart` вместо `enable --now` по той же причине, что и в X7 (см. подробности там): при переустановке поверх работающего сервиса `--now` не перечитал бы новый конфиг с новым паролем.
+
+Верификация без ожидания выпуска сертификата (ACME не ждём), но с коротким ретраем: `systemctl restart` возвращает управление, как только процесс форкнут, а не когда он занял сокет, поэтому одиночная мгновенная проверка гонится со стартом демона.
 ```
 systemctl is-active hysteria-server.service
 ss -ulnp | grep -E ':443\b'
@@ -547,7 +552,8 @@ quic:
 **Шаг H5a. Запуск и выпуск сертификата.**
 ```
 systemctl daemon-reload
-systemctl enable --now hysteria-server.service
+systemctl enable hysteria-server.service
+systemctl restart hysteria-server.service
 ```
 Выпуск сертификата асинхронный. Верификация - опрос в цикле до 180 с:
 ```
@@ -902,7 +908,7 @@ export type ErrorCode =
 - Каждый протокол - класс, наследник `BaseInstaller` / `BaseRemover`. Общий шаблон установки (Template Method) живёт в базовом классе: `prepare()`, `installCore()`, `generateSecrets()`, `writeConfig()`, `validate()`, `start()`, `verify()`, `buildLink()`. Подкласс переопределяет только своё.
 - Домен зависит от интерфейсов (`ICommandRunner`, `IFileTransfer`, `IProgressSink`), не от реализаций. Внедрение через конструктор, без сервис-локаторов и глобалов.
 - Парсеры вывода команд - чистые функции в `domain/parsers`, отдельно от исполнения. Ни одна регулярка не живёт по месту вызова.
-- Дублирование команд запрещено: `apt-get install` вызывается из одного места, `systemctl enable --now` из одного места.
+- Дублирование команд запрещено: `apt-get install` вызывается из одного места, запуск сервиса (`systemctl enable` + `restart`, см. X7) из одного места. Обе команды живут в `BaseInstaller` (`installAptPackages()`, `enableAndRestartService()`), там же общий `waitForService()` для верификации порта.
 - Строки, показываемые пользователю, лежат в renderer. Main возвращает коды и структурированные данные, не готовые русские фразы (исключение: `title` шага, он часть контракта `StepView`).
 
 ### 10.3 Комментарии

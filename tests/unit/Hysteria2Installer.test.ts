@@ -53,6 +53,7 @@ function install(
     [0, 0, 0],
     1,
     20,
+    20,
   );
   return { installer, fileTransfer, outcome: installer.install() };
 }
@@ -81,7 +82,10 @@ describe('Hysteria2Installer - self-signed happy path', () => {
     expect(runner.calls).toContain(
       `openssl ecparam -genkey -name prime256v1 -out ${shellQuote(KEY_PATH)}`,
     );
-    expect(runner.calls).toContain('systemctl enable --now hysteria-server.service');
+    // restart, not `enable --now`, so a reinstall over a live service
+    // actually loads the new config and password.
+    expect(runner.calls).toContain('systemctl enable hysteria-server.service');
+    expect(runner.calls).toContain('systemctl restart hysteria-server.service');
   });
 
   it('skips installing openssl when it is already present', async () => {
