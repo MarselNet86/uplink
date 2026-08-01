@@ -10,6 +10,10 @@ export interface ConnectFormValues {
   domainEnabled: boolean;
   domain: string;
   acmeEmail: string;
+  /** Optional donor override for Reality; empty means "pick automatically" (tech.md 5.6 X4). */
+  realitySni: string;
+  /** Optional masquerade SNI for Hysteria2 self-signed; empty means the built-in default. */
+  hysteriaSni: string;
 }
 
 export type ConnectFormErrors = Partial<Record<keyof ConnectFormValues, string>>;
@@ -45,6 +49,14 @@ export function validateConnectForm(values: ConnectFormValues): ConnectFormError
     if (!EMAIL_RE.test(values.acmeEmail.trim())) {
       errors.acmeEmail = 'Введите почту в формате you@example.com';
     }
+  }
+
+  // Both SNI fields are optional; only validate what was actually typed.
+  if (values.realitySni.trim() && !FQDN_RE.test(values.realitySni.trim())) {
+    errors.realitySni = 'Введите домен, например www.cloudflare.com';
+  }
+  if (values.hysteriaSni.trim() && !FQDN_RE.test(values.hysteriaSni.trim())) {
+    errors.hysteriaSni = 'Введите домен, например bing.com';
   }
 
   return errors;

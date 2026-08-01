@@ -19,6 +19,8 @@ const initialValues: ConnectFormValues = {
   domainEnabled: false,
   domain: '',
   acmeEmail: '',
+  realitySni: '',
+  hysteriaSni: '',
 };
 
 export interface ConnectFormProps {
@@ -42,14 +44,21 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
 
     setLoading(true);
     try {
+      // Omitted rather than sent empty: exactOptionalPropertyTypes and the
+      // zod schema both treat these as "absent means use the default".
+      const sni = {
+        ...(values.realitySni.trim() ? { realitySni: values.realitySni.trim() } : {}),
+        ...(values.hysteriaSni.trim() ? { hysteriaSni: values.hysteriaSni.trim() } : {}),
+      };
       const params: DeployParams = values.domainEnabled
         ? {
             distroHint: values.distroHint,
             tlsMode: 'acme-domain',
             domain: values.domain.trim(),
             acmeEmail: values.acmeEmail.trim(),
+            ...sni,
           }
-        : { distroHint: values.distroHint, tlsMode: 'self-signed' };
+        : { distroHint: values.distroHint, tlsMode: 'self-signed', ...sni };
       const result = await window.uplink.sshCheck({
         credentials: {
           host: values.host.trim(),
@@ -142,6 +151,30 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
             />
           </>
         )}
+      </Collapsible>
+
+      <Collapsible title="Маскировка SNI · необязательно">
+        <p className="field-hint" style={{ marginBottom: 'var(--s2)' }}>
+          Оставьте пустым, чтобы приложение выбрало значения само.
+        </p>
+        <Input
+          label="Донор для Reality"
+          mono
+          placeholder="www.cloudflare.com"
+          value={values.realitySni}
+          onChange={(e) => set('realitySni', e.target.value)}
+          error={errors.realitySni}
+          hint="Чужой сайт с TLS 1.3 и короткой цепочкой сертификатов. Проверяется перед установкой."
+        />
+        <Input
+          label="SNI для Hysteria2"
+          mono
+          placeholder="bing.com"
+          value={values.hysteriaSni}
+          onChange={(e) => set('hysteriaSni', e.target.value)}
+          error={errors.hysteriaSni}
+          hint="Только имя в самоподписанном сертификате, никуда не резолвится."
+        />
       </Collapsible>
 
       <ErrorDetailsModal

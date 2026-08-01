@@ -33,8 +33,8 @@ import type { TrackableUnit } from '../runOrchestration';
 const INSTALLER_FACTORIES: Partial<
   Record<ProtocolId, (session: SshSession, host: string, params: DeployParams) => BaseInstaller>
 > = {
-  'vless-reality': (session, host) =>
-    new XrayRealityInstaller(session.getCommandRunner(), session.getFileTransfer(), host),
+  'vless-reality': (session, host, params) =>
+    new XrayRealityInstaller(session.getCommandRunner(), session.getFileTransfer(), host, params),
   hysteria2: (session, host, params) =>
     new Hysteria2Installer(session.getCommandRunner(), session.getFileTransfer(), host, params),
 };

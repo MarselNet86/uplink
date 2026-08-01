@@ -183,8 +183,13 @@ export class Hysteria2Installer extends BaseInstaller {
   // config was already fully written by writeConfig().
   protected async validate(): Promise<void> {
     if (this.params.tlsMode !== 'self-signed') return;
-    const cert = await generateSelfSignedCert(this.runner, HYSTERIA_FAKE_SNI);
+    const cert = await generateSelfSignedCert(this.runner, this.fakeSni());
     this.fingerprint = cert.fingerprint;
+  }
+
+  /** User-supplied masquerade SNI, or the built-in default. Never resolved (tech.md 5.7 H4s). */
+  private fakeSni(): string {
+    return this.params.hysteriaSni || HYSTERIA_FAKE_SNI;
   }
 
   // H6s/H5a: identical start for both branches; restart (not enable --now)
@@ -222,7 +227,7 @@ export class Hysteria2Installer extends BaseInstaller {
     return buildHysteria2SelfSignedLink({
       password: this.password,
       host: this.host,
-      sni: HYSTERIA_FAKE_SNI,
+      sni: this.fakeSni(),
       fingerprintSha256: this.fingerprint,
     });
   }

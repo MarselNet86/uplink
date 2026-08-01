@@ -20,6 +20,18 @@ export interface DeployParams {
   tlsMode: TlsMode; // default 'self-signed', domain not required
   domain?: string; // required only when tlsMode === 'acme-domain'
   acmeEmail?: string; // required only when tlsMode === 'acme-domain'
+  /**
+   * Optional Reality donor override (tech.md 5.6 X4). Replaces the built-in
+   * candidate list but still has to pass the same donor checks. Empty means
+   * "pick automatically".
+   */
+  realitySni?: string;
+  /**
+   * Optional Hysteria2 masquerade SNI for the self-signed branch (tech.md
+   * 5.7 H4s): the certificate CN and the `sni` in the client link. Never
+   * resolved, so any hostname works. Empty means the built-in default.
+   */
+  hysteriaSni?: string;
 }
 
 export interface DistroInfo {
