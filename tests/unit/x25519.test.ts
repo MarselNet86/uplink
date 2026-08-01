@@ -24,6 +24,15 @@ describe('parseX25519Output', () => {
     expect(Object.values(result)).not.toContain('3wZ2xkxT7O6qYb1DcZjBw3Sk9NcVoV1eZTGqDxHUV6E');
   });
 
+  it('parses the "Password (PublicKey):" variant seen on a live v25.3.6+ server', () => {
+    const result = parseX25519Output(fixture('x25519-password-publickey.txt'));
+    expect(result).toEqual({
+      privateKey: 'CKM407S-qCUkaekiW0J96m4j7-SmSHJpR3HAh-9z0VQ',
+      publicKey: 'RdZ2tZdz1pDK3FOwzUFuySjdEfsF7K3gpIqHAFVY3Sk',
+    });
+    expect(Object.values(result)).not.toContain('UGEGMTYpZ50NVb6UdIjeyYBLErSOz7FH17tvwWXMoVA');
+  });
+
   it('throws on unrecognized output instead of returning a partial pair', () => {
     expect(() => parseX25519Output('nonsense output\n')).toThrow(/unrecognized/);
   });

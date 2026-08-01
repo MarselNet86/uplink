@@ -7,9 +7,11 @@ export interface X25519KeyPair {
  * Parses `xray x25519` output into {privateKey, publicKey} regardless of
  * CLI version (tech.md 5.6 X3 / pitfall #1). Old builds print
  * "Private key:"/"Public key:"; v25.3.6+ prints "PrivateKey:"/"Password:"
- * (Password is the renamed public key) plus an unrelated "Hash32:" line
- * that must never be mistaken for the public key. Parsed as a key-value
- * map, not positionally, so both layouts work without version detection.
+ * (Password is the renamed public key), and some v25.3.6+ builds instead
+ * label that same line "Password (PublicKey):" - confirmed live against a
+ * real server. Both carry an unrelated "Hash32:" line that must never be
+ * mistaken for the public key. Parsed as a key-value map, not positionally,
+ * so every layout works without version detection.
  */
 export function parseX25519Output(stdout: string): X25519KeyPair {
   const fields = new Map<string, string>();
@@ -22,7 +24,8 @@ export function parseX25519Output(stdout: string): X25519KeyPair {
   }
 
   const privateKey = fields.get('PrivateKey') ?? fields.get('Private key');
-  const publicKey = fields.get('Password') ?? fields.get('Public key');
+  const publicKey =
+    fields.get('Password') ?? fields.get('Password (PublicKey)') ?? fields.get('Public key');
 
   if (!privateKey || !publicKey) {
     throw new Error(`unrecognized "xray x25519" output: ${stdout}`);
