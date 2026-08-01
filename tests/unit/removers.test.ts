@@ -4,6 +4,7 @@ import {
   HY2_REMOVE_SCRIPT,
   Hysteria2Remover,
 } from '../../src/main/domain/removers/Hysteria2Remover';
+import { CommandRunnerError } from '../../src/main/ssh/CommandRunner';
 import { FakeCommandRunner } from '../fakes/FakeCommandRunner';
 
 describe('XrayRemover', () => {
@@ -51,6 +52,14 @@ describe('XrayRemover', () => {
     expect(remover.ownsStep('xray-remove')).toBe(true);
     expect(remover.ownsStep('hy2-remove')).toBe(false);
   });
+
+  it('toAppError preserves CommandRunnerError codes instead of collapsing them to E_UNKNOWN', () => {
+    const remover = new XrayRemover(new FakeCommandRunner(), '203.0.113.10');
+    expect(remover.toAppError(new CommandRunnerError('E_TIMEOUT', 'command timed out'))).toEqual({
+      code: 'E_TIMEOUT',
+      message: 'command timed out',
+    });
+  });
 });
 
 describe('Hysteria2Remover', () => {
@@ -65,6 +74,17 @@ describe('Hysteria2Remover', () => {
     expect(runner.calls).toContain(HY2_REMOVE_SCRIPT);
     expect(runner.calls).not.toContain('systemctl disable --now hysteria-server.service');
     expect(remover.getOutcome()).toEqual({ protocol: 'hysteria2', ok: true });
+  });
+
+  it('purges the config directory even when the official script reports success (confirmed live: it leaves /etc/hysteria behind)', async () => {
+    const runner = new FakeCommandRunner();
+    runner.setDefault({ code: 0 });
+    runner.script('test -x /usr/local/bin/hysteria', { code: 1 });
+
+    const remover = new Hysteria2Remover(runner, '203.0.113.10');
+    await remover.buildStep().run({ isCancelled: () => false });
+
+    expect(runner.calls).toContain("rm -rf '/etc/hysteria'");
   });
 
   it('falls back to manual cleanup when the official script fails', async () => {

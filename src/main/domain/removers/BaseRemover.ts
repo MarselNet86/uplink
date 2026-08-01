@@ -1,5 +1,7 @@
 import type { AppError, ProtocolId, ProtocolOutcome, StepId } from '@shared/types';
 import type { Step } from '../../pipeline/Step';
+import { shellQuote } from '../../security/shellQuote';
+import { CommandRunnerError } from '../../ssh/CommandRunner';
 import type { ICommandRunner } from '../../ssh/types';
 import { InstallerError } from '../installers/InstallerError';
 
@@ -49,8 +51,26 @@ export abstract class BaseRemover {
       title: this.stepSpec.title,
       weight: this.stepSpec.weight,
       critical: true,
-      run: () => this.removeCore(),
+      run: async () => {
+        await this.removeCore();
+        await this.purgeConfigPaths();
+      },
     };
+  }
+
+  /**
+   * Deletes `configPaths` unconditionally after removeCore() succeeds.
+   * Confirmed live: Hysteria2's official `--remove` script deletes the
+   * binary and systemd units but leaves `/etc/hysteria` (config, cert, key)
+   * behind, treating it as user data. ProtocolDetector's `absent` state
+   * requires the config gone too, so without this a removed protocol keeps
+   * reporting as `broken` ("found, service not running") forever - the
+   * vendor script's own cleanup can never be trusted for this on its own.
+   */
+  private async purgeConfigPaths(): Promise<void> {
+    for (const path of this.configPaths) {
+      await this.runner.runPrivileged(`rm -rf ${shellQuote(path)}`);
+    }
   }
 
   /** Removal has no link to show - just a success marker for RunResult.outcomes. */
@@ -74,6 +94,7 @@ export abstract class BaseRemover {
   /** Maps a caught removeCore() error to the frozen AppError shape (tech.md section 8). */
   toAppError(err: unknown): AppError {
     if (err instanceof InstallerError) return { code: err.code, message: err.message };
+    if (err instanceof CommandRunnerError) return { code: err.code, message: err.message };
     return {
       code: 'E_UNKNOWN',
       message: err instanceof Error ? err.message : 'unknown remover error',
