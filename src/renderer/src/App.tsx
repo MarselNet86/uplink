@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { CheckResult, DeployParams, ProtocolId } from '@shared/types';
+import type { AppError, CheckResult, DeployParams, ProtocolId } from '@shared/types';
 import { useAppStore } from './store/useAppStore';
+import { ErrorDetailsModal } from './features/common/ErrorDetailsModal';
 import { KitchenSink } from './features/common/KitchenSink';
 import { WizardShell } from './features/common/WizardShell';
 import { ConnectForm } from './features/connect/ConnectForm';
@@ -24,6 +25,8 @@ export default function App() {
   const setRunNote = useAppStore((state) => state.setRunNote);
   const finishRun = useAppStore((state) => state.finishRun);
   const resetRun = useAppStore((state) => state.resetRun);
+  const fatalError = useAppStore((state) => state.fatalError);
+  const setFatalError = useAppStore((state) => state.setFatalError);
   const [manageOpen, setManageOpen] = useState(false);
 
   useEffect(
@@ -50,6 +53,9 @@ export default function App() {
     setDeployParams(params);
   };
 
+  // These channels reject on a stale/missing session, which leaves the user
+  // on step 2 with nothing to explain why nothing happened. Route the error
+  // into the app-wide modal instead of dropping it.
   const handleInstall = async (protocols: ProtocolId[]) => {
     if (!checkResult || !deployParams) return;
     try {
@@ -59,9 +65,8 @@ export default function App() {
         mode: 'install',
         params: deployParams,
       });
-    } catch {
-      // install:start only rejects on a stale/missing session; the user is
-      // still on step 2 and can re-run the check to get a fresh one.
+    } catch (err) {
+      setFatalError({ error: err as AppError, context: 'Запуск установки' });
     }
   };
 
@@ -70,9 +75,8 @@ export default function App() {
     setManageOpen(false);
     try {
       await window.uplink.protocolsRemove({ sessionId: checkResult.sessionId, protocols });
-    } catch {
-      // protocols:remove only rejects on a stale/missing session; the user
-      // is still on step 2 and can re-run the check to get a fresh one.
+    } catch (err) {
+      setFatalError({ error: err as AppError, context: 'Удаление протоколов' });
     }
   };
 
@@ -86,8 +90,8 @@ export default function App() {
         mode: 'reinstall',
         params: deployParams,
       });
-    } catch {
-      // same as handleRemove: a stale session just leaves the user on step 2.
+    } catch (err) {
+      setFatalError({ error: err as AppError, context: 'Переустановка' });
     }
   };
 
@@ -149,6 +153,13 @@ export default function App() {
       )}
 
       <HostKeyPromptModal />
+
+      <ErrorDetailsModal
+        open={fatalError !== null}
+        error={fatalError?.error ?? null}
+        {...(fatalError ? { context: fatalError.context } : {})}
+        onClose={() => setFatalError(null)}
+      />
     </>
   );
 }

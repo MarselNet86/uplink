@@ -29,7 +29,14 @@ async function invokeChecked<T>(channel: string, payload: unknown): Promise<T> {
     return (await ipcRenderer.invoke(channel, payload)) as T;
   } catch (err) {
     const decoded = err instanceof Error ? decodeAppError(err.message) : null;
-    const appError: AppError = decoded ?? { code: 'E_UNKNOWN', message: 'Неизвестная ошибка' };
+    // An undecodable rejection is main crashing before it could encode an
+    // AppError (a thrown zod issue, a missing handler). Its raw text is the
+    // only clue about what actually broke, so it becomes the message rather
+    // than being replaced by a generic string the user cannot act on.
+    const appError: AppError = decoded ?? {
+      code: 'E_UNKNOWN',
+      message: err instanceof Error ? `${channel}: ${err.message}` : `${channel}: ${String(err)}`,
+    };
     return Promise.reject(appError);
   }
 }

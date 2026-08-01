@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import type { AppError, CheckResult, DeployParams } from '@shared/types';
-import { Alert } from '../../ui/Alert';
 import { Button } from '../../ui/Button';
 import { Checkbox } from '../../ui/Checkbox';
 import { Collapsible } from '../../ui/Collapsible';
 import { Input } from '../../ui/Input';
 import { PasswordInput } from '../../ui/PasswordInput';
 import { Select } from '../../ui/Select';
-import { ERROR_TEXT } from '../common/errorText';
+import { ErrorDetailsModal } from '../common/ErrorDetailsModal';
 import { validateConnectForm } from './formValidation';
 import type { ConnectFormErrors, ConnectFormValues } from './formValidation';
 
@@ -145,11 +144,12 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
         )}
       </Collapsible>
 
-      {serverError && (
-        <Alert tone="error" title={ERROR_TEXT[serverError.code].title}>
-          {ERROR_TEXT[serverError.code].hint}
-        </Alert>
-      )}
+      <ErrorDetailsModal
+        open={serverError !== null}
+        error={serverError}
+        context="Проверка сервера"
+        onClose={() => setServerError(null)}
+      />
 
       <div className="split-foot">
         <span className="eyebrow">Пароль не сохраняется на диск</span>

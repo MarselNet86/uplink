@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CheckResult, DeployParams, RunResult, StepView } from '@shared/types';
+import type { AppError, CheckResult, DeployParams, RunResult, StepView } from '@shared/types';
 
 export type RouteId = 'wizard' | 'kitchen-sink';
 
@@ -11,9 +11,19 @@ interface RunState {
   result: RunResult | null;
 }
 
+/** One failure that has no step of its own to render it, e.g. a stale
+ * session rejecting install:start. Surfaced app-wide as a modal so it can
+ * never be swallowed silently. */
+interface FatalError {
+  error: AppError;
+  context: string;
+}
+
 interface AppState {
   route: RouteId;
   setRoute: (route: RouteId) => void;
+  fatalError: FatalError | null;
+  setFatalError: (fatal: FatalError | null) => void;
   checkResult: CheckResult | null;
   setCheckResult: (result: CheckResult | null) => void;
   deployParams: DeployParams | null;
@@ -30,6 +40,8 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   route: 'wizard',
   setRoute: (route) => set({ route }),
+  fatalError: null,
+  setFatalError: (fatalError) => set({ fatalError }),
   checkResult: null,
   setCheckResult: (checkResult) => set({ checkResult }),
   deployParams: null,

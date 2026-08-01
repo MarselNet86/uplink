@@ -3,6 +3,7 @@ import type { StepView } from '@shared/types';
 import { Alert } from '../../ui/Alert';
 import { Button } from '../../ui/Button';
 import { Collapsible } from '../../ui/Collapsible';
+import { CopyButton } from '../../ui/CopyButton';
 import { ProgressBar } from '../../ui/ProgressBar';
 import { StepList } from '../../ui/StepList';
 import { useAppStore } from '../../store/useAppStore';
@@ -26,6 +27,12 @@ export function InstallStep() {
     .find((step) => step.status === 'running');
   const stage = currentStep?.title ?? 'Установка';
   const failed = run.steps.some((step) => step.status === 'failed');
+  const failedStep = run.steps.find((step) => step.status === 'failed');
+  // While the run is still going `result` is null, so name the failed step -
+  // that is more than the placeholder alone told the user.
+  const diagnostics =
+    run.result?.diagnostics ??
+    (failedStep ? `Шаг «${failedStep.title}» завершился с ошибкой.` : null);
 
   const handleCancel = () => {
     setCancelling(true);
@@ -49,8 +56,9 @@ export function InstallStep() {
       {failed && (
         <Collapsible title="Диагностика">
           <pre className="mono" style={{ whiteSpace: 'pre-wrap' }}>
-            {run.result?.diagnostics ?? 'Подробности появятся после завершения шага.'}
+            {diagnostics ?? 'Подробности появятся после завершения шага.'}
           </pre>
+          {diagnostics && <CopyButton value={diagnostics} className="mt-2" />}
         </Collapsible>
       )}
 
