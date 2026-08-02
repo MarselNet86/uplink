@@ -7,7 +7,8 @@ export interface ConnectFormValues {
   port: string;
   username: string;
   password: string;
-  domainEnabled: boolean;
+  /** True when the user opted to type their own domain/email instead of the sslip.io default. */
+  domainOverride: boolean;
   domain: string;
   acmeEmail: string;
   /** Optional donor override for Reality; empty means "pick automatically" (tech.md 5.6 X4). */
@@ -21,6 +22,33 @@ export type ConnectFormErrors = Partial<Record<keyof ConnectFormValues, string>>
 const HOST_RE = /^[a-zA-Z0-9.:\-[\]]+$/;
 const FQDN_RE = /^(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const IPV4_RE = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/;
+
+/**
+ * Free, registration-less ACME domain for Hysteria2, derived from whatever
+ * the user already typed in "IP или хост" - no separate purchase or signup
+ * needed for the default path. Two cases actually resolve to the server:
+ *
+ * - an IPv4 host gets the sslip.io wildcard suffix (`1.2.3.4.sslip.io`
+ *   resolves to `1.2.3.4` with no registration - see sslip.io);
+ * - a host that's already a domain is reused as-is, since SSH just
+ *   connected to it, so it necessarily resolves to this server too.
+ *
+ * IPv6 hosts and anything else return '' (sslip.io's IPv6 form needs
+ * dash-encoding, out of scope for the auto path) - callers fall back to
+ * `self-signed` rather than guess.
+ */
+export function deriveAutoDomain(host: string): string {
+  const trimmed = host.trim();
+  if (IPV4_RE.test(trimmed)) return `${trimmed}.sslip.io`;
+  if (FQDN_RE.test(trimmed)) return trimmed;
+  return '';
+}
+
+/** Placeholder ACME contact for the auto domain path - Let's Encrypt only needs a syntactically valid address, never sent anywhere unless the cert is about to expire. */
+export function deriveAutoAcmeEmail(domain: string): string {
+  return `admin@${domain}`;
+}
 
 export function validateConnectForm(values: ConnectFormValues): ConnectFormErrors {
   const errors: ConnectFormErrors = {};
@@ -42,7 +70,7 @@ export function validateConnectForm(values: ConnectFormValues): ConnectFormError
     errors.password = 'Введите пароль';
   }
 
-  if (values.domainEnabled) {
+  if (values.domainOverride) {
     if (!FQDN_RE.test(values.domain.trim())) {
       errors.domain = 'Введите домен, например vpn.example.com';
     }

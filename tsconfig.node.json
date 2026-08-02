@@ -6,6 +6,7 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/shared/**/*",
+    "src/renderer/src/features/connect/formValidation.ts",
     "tests/**/*"
   ],
   "compilerOptions": {
@@ -18,7 +19,8 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": ["src/shared/*"],
+      "@renderer/*": ["src/renderer/src/*"]
     }
   }
 }

@@ -7,7 +7,7 @@ import { Input } from '../../ui/Input';
 import { PasswordInput } from '../../ui/PasswordInput';
 import { Select } from '../../ui/Select';
 import { ErrorDetailsModal } from '../common/ErrorDetailsModal';
-import { validateConnectForm } from './formValidation';
+import { deriveAutoAcmeEmail, deriveAutoDomain, validateConnectForm } from './formValidation';
 import type { ConnectFormErrors, ConnectFormValues } from './formValidation';
 
 const initialValues: ConnectFormValues = {
@@ -16,7 +16,7 @@ const initialValues: ConnectFormValues = {
   port: '22',
   username: 'root',
   password: '',
-  domainEnabled: false,
+  domainOverride: false,
   domain: '',
   acmeEmail: '',
   realitySni: '',
@@ -36,6 +36,12 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
   const set = <K extends keyof ConnectFormValues>(key: K, value: ConnectFormValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }));
 
+  // Recomputed every render from the current host - sslip.io needs no
+  // registration, so this is the zero-input default for Hysteria2's
+  // trusted-cert mode. '' means the host doesn't fit either auto case
+  // (not IPv4, not already a domain), and self-signed is used instead.
+  const autoDomain = deriveAutoDomain(values.host);
+
   const submit = async () => {
     const fieldErrors = validateConnectForm(values);
     setErrors(fieldErrors);
@@ -50,12 +56,18 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
         ...(values.realitySni.trim() ? { realitySni: values.realitySni.trim() } : {}),
         ...(values.hysteriaSni.trim() ? { hysteriaSni: values.hysteriaSni.trim() } : {}),
       };
-      const params: DeployParams = values.domainEnabled
+      const domain = values.domainOverride ? values.domain.trim() : autoDomain;
+      const acmeEmail = values.domainOverride
+        ? values.acmeEmail.trim()
+        : domain
+          ? deriveAutoAcmeEmail(domain)
+          : '';
+      const params: DeployParams = domain
         ? {
             distroHint: values.distroHint,
             tlsMode: 'acme-domain',
-            domain: values.domain.trim(),
-            acmeEmail: values.acmeEmail.trim(),
+            domain,
+            acmeEmail,
             ...sni,
           }
         : { distroHint: values.distroHint, tlsMode: 'self-signed', ...sni };
@@ -125,14 +137,32 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
         ]}
       />
 
-      <Collapsible title="Домен · необязательно">
+      <Collapsible title="Домен для Hysteria2 · автоматически">
+        <p className="field-hint" style={{ marginBottom: 'var(--s2)' }}>
+          {autoDomain ? (
+            <>
+              Бесплатно и без регистрации будет использован домен <code>{autoDomain}</code> и
+              доверенный сертификат Let&apos;s Encrypt.
+            </>
+          ) : (
+            'Автоматический домен недоступен для этого хоста (не похож на IPv4 или домен) - будет использован самоподписанный сертификат.'
+          )}
+        </p>
         <Checkbox
-          checked={values.domainEnabled}
-          onCheckedChange={(checked) => set('domainEnabled', checked)}
-          label="У меня есть домен"
-          description="Hysteria2 будет использовать доверенный сертификат ACME вместо самоподписанного"
+          checked={values.domainOverride}
+          onCheckedChange={(checked) => {
+            set('domainOverride', checked);
+            if (checked) {
+              if (!values.domain.trim()) set('domain', autoDomain);
+              if (!values.acmeEmail.trim() && autoDomain) {
+                set('acmeEmail', deriveAutoAcmeEmail(autoDomain));
+              }
+            }
+          }}
+          label="Указать свой домен"
+          description="Только если у вас уже есть собственный домен, направленный на этот сервер"
         />
-        {values.domainEnabled && (
+        {values.domainOverride && (
           <>
             <Input
               label="Домен"
