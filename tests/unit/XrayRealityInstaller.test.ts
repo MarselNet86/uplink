@@ -70,7 +70,7 @@ describe('XrayRealityInstaller - happy path', () => {
       link:
         'vless://8f2c41ba-7d3e-4c9a-b1f0-2e5d8a6c4b90@203.0.113.10:443?' +
         'type=tcp&security=reality&encryption=none&flow=xtls-rprx-vision&' +
-        'sni=www.cloudflare.com&fp=chrome&pbk=pub456&sid=a1b2c3d4e5f60718&spx=%2F#Uplink-VLESS',
+        'sni=www.cloudflare.com&fp=firefox&pbk=pub456&sid=a1b2c3d4e5f60718&spx=%2F#Uplink-VLESS',
     });
 
     expect(fileTransfer.writes).toHaveLength(1);

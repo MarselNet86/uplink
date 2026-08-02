@@ -17,6 +17,22 @@ export interface GeneratedCert {
  * rather than `hysteria cert` - on 2.9.x that command breaks clients with
  * `tls: internal error` unless `sniGuard: disable` is also set, an
  * avoidable coupling to core-version behavior (tech.md 5.7 H4s).
+ *
+ * The three `-addext` flags are not cosmetic, each fixes a client that
+ * otherwise refuses the certificate:
+ *
+ * - `subjectAltName`: Go dropped CN-based hostname matching in 1.15, and
+ *   both Xray-core and hysteria itself are Go. A CN-only certificate can
+ *   never match `sni`, so the name has to be repeated in a SAN.
+ * - `basicConstraints=CA:FALSE`: `openssl req -x509` defaults to CA:TRUE.
+ *   Xray-core matches `pinnedPeerCertSha256` and *then* still demands a
+ *   CA -> leaf chain; a lone CA certificate has no leaf and the handshake
+ *   fails despite the correct pin (XTLS/Xray-core#5904, #5655).
+ * - `keyUsage`/`extendedKeyUsage`: `digitalSignature` only - the key is
+ *   prime256v1, so `keyEncipherment` (RSA key transport) does not apply.
+ *
+ * `-addext` needs openssl 1.1.1+, which every supported distro has
+ * (Debian 10+, Ubuntu 18.04+ - see DistroDetector's allow-list).
  */
 export async function generateSelfSignedCert(
   runner: ICommandRunner,
@@ -27,7 +43,11 @@ export async function generateSelfSignedCert(
   );
   await runner.runPrivileged(
     `openssl req -new -x509 -days ${CERT_DAYS} -key ${shellQuote(KEY_PATH)} ` +
-      `-out ${shellQuote(CERT_PATH)} -subj ${shellQuote(`/CN=${commonName}`)}`,
+      `-out ${shellQuote(CERT_PATH)} -subj ${shellQuote(`/CN=${commonName}`)} ` +
+      `-addext ${shellQuote(`subjectAltName=DNS:${commonName}`)} ` +
+      `-addext ${shellQuote('basicConstraints=critical,CA:FALSE')} ` +
+      `-addext ${shellQuote('keyUsage=critical,digitalSignature')} ` +
+      `-addext ${shellQuote('extendedKeyUsage=serverAuth')}`,
   );
   // Generated as root over the exec channel, but hysteria-server.service
   // reads these as its own `hysteria` user (same hazard as the config file

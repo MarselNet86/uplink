@@ -472,7 +472,11 @@ bash <(curl -fsSL https://get.hy2.sh/)
 ```
 openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
 openssl req -new -x509 -days 36500 -key /etc/hysteria/server.key \
-  -out /etc/hysteria/server.crt -subj "/CN=<FAKE_SNI>"
+  -out /etc/hysteria/server.crt -subj "/CN=<FAKE_SNI>" \
+  -addext "subjectAltName=DNS:<FAKE_SNI>" \
+  -addext "basicConstraints=critical,CA:FALSE" \
+  -addext "keyUsage=critical,digitalSignature" \
+  -addext "extendedKeyUsage=serverAuth"
 chmod 600 /etc/hysteria/server.key /etc/hysteria/server.crt
 chown hysteria:hysteria /etc/hysteria/server.key /etc/hysteria/server.crt
 ```
@@ -597,7 +601,7 @@ vless://<UUID>@<HOST>:443
   &encryption=none
   &flow=xtls-rprx-vision
   &sni=<REALITY_SNI>
-  &fp=chrome
+  &fp=firefox
   &pbk=<PASSWORD_PUBLIC_KEY>
   &sid=<SHORT_ID>
   &spx=%2F
@@ -607,13 +611,20 @@ vless://<UUID>@<HOST>:443
 
 Hysteria2, `self-signed` (дефолт):
 ```
-hy2://<PASSWORD>@<IP>:443?sni=<FAKE_SNI>&insecure=1&pinSHA256=<FINGERPRINT>#Uplink-HY2
+hy2://<PASSWORD>@<IP>:443?sni=<FAKE_SNI>&pinSHA256=<FINGERPRINT>#Uplink-HY2
 ```
-Хост - IP сервера. `sni` - та же константа-заглушка, что была в CN сертификата (раздел 5.7, шаг H4s), нужна только для унификации ClientHello и роли не играет благодаря `sniGuard: disable`. `insecure=1` обязателен: без него клиент попытается проверить сертификат по системному доверенному хранилищу и получит `unknown authority`. `pinSHA256` - отпечаток без двоеточий, из парсера `certFingerprint.ts`.
+Хост - IP сервера. `sni` - та же константа-заглушка, что была в CN и SAN сертификата (раздел 5.7, шаг H4s), нужна только для унификации ClientHello и роли не играет благодаря `sniGuard: disable`. `pinSHA256` - отпечаток без двоеточий, из парсера `certFingerprint.ts`.
 
-Клиенты, у которых `pinSHA256` в ссылке ломается (встречалось в некоторых сборках v2rayNG), обслуживаются переключателем в `KeyCard`: «Ссылка без пина» убирает параметр `pinSHA256`, оставляя только `insecure=1`. Это осознанное снижение защиты от MITM, дефолт - ссылка с пином.
+**Целевые клиенты этой ссылки - на Xray-core: INCY, Happ, v2rayN.** Параметр `insecure` не выдаётся никогда. Xray-core убрал `allowInsecure` за жёсткой проверкой даты, сработавшей 2026-06-01, и после неё отвергается **весь конфиг**, а не один outbound. Воспроизведено дословно на Xray 26.3.27:
 
-Второй переключатель, «Ссылка без insecure», убирает `insecure=1` и оставляет пин. Он нужен для обратного случая: в новых сборках на XrayCore параметр `allowInsecure` удалён совсем, и такой клиент отвергает ссылку с ошибкой «The feature "allow-Insecure" has been removed and migrated to "pinnedPeerCertSha256"» (наблюдалось на XrayCore 4.7.2). Убирать `insecure` безопасно именно потому, что пин уже передан: клиент по-прежнему проверяет сертификат, только по отпечатку, а не по цепочке доверия. Оба переключателя вычитающие и применяются к уже сгенерированной ссылке в renderer, формат из `LinkBuilder` не меняется.
+```
+Failed to start: ... Failed to build TLS config. >
+The feature "allowInsecure" has been removed and migrated to "pinnedPeerCertSha256".
+```
+
+Поэтому `pinSHA256` здесь не опция, а несущий элемент: это единственное, что позволяет клиенту принять никем не выданный сертификат - проверка идёт по отпечатку вместо цепочки доверия. Варианта ссылки без пина не существует, он не смог бы подключиться. Проверено на живом стенде: Xray-core принимает пин и в верхнем, и в нижнем регистре, и одинаково успешно работает как с листовым сертификатом, так и со старым `CA:TRUE`.
+
+Обратная сторона размена: нативный клиент hysteria и sing-box, наоборот, **требуют** `insecure`, и пин их не устраивает - проверено, хендшейк падает на проверке x509. Эти клиенты обслуживаются режимом `acme-domain` с настоящим сертификатом.
 
 Hysteria2, `acme-domain` (опция):
 ```

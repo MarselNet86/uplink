@@ -68,7 +68,7 @@ describe('Hysteria2Installer - self-signed happy path', () => {
     expect(result.link).toBe(
       'hy2://' +
         result.link?.slice('hy2://'.length, result.link.indexOf('@')) +
-        '@203.0.113.10:443?sni=bing.com&insecure=1&pinSHA256=ABCDEF00112233445566778899AABBCC#Uplink-HY2',
+        '@203.0.113.10:443?sni=bing.com&pinSHA256=ABCDEF00112233445566778899AABBCC#Uplink-HY2',
     );
 
     expect(fileTransfer.writes).toHaveLength(1);
@@ -86,6 +86,37 @@ describe('Hysteria2Installer - self-signed happy path', () => {
     // actually loads the new config and password.
     expect(runner.calls).toContain('systemctl enable hysteria-server.service');
     expect(runner.calls).toContain('systemctl restart hysteria-server.service');
+  });
+
+  it('generates a leaf certificate with a SAN, not a CA certificate', async () => {
+    const runner = makeHappyRunner();
+    const { outcome } = install(selfSignedParams, runner);
+    await outcome;
+
+    const req = runner.calls.find((c) => c.startsWith('openssl req '));
+    if (!req) throw new Error('expected an "openssl req" call');
+
+    // Go dropped CN-based hostname matching in 1.15 and both Xray-core and
+    // hysteria are Go, so the name has to be in a SAN as well as the CN.
+    expect(req).toContain(shellQuote('/CN=bing.com'));
+    expect(req).toContain(shellQuote('subjectAltName=DNS:bing.com'));
+    // `openssl req -x509` defaults to CA:TRUE; a lone CA certificate has no
+    // leaf, which some client cores reject even with a matching pin.
+    expect(req).toContain(shellQuote('basicConstraints=critical,CA:FALSE'));
+    // prime256v1 key: digitalSignature only, keyEncipherment is RSA-only.
+    expect(req).toContain(shellQuote('keyUsage=critical,digitalSignature'));
+    expect(req).toContain(shellQuote('extendedKeyUsage=serverAuth'));
+  });
+
+  it('puts the user-supplied masquerade SNI into the certificate too', async () => {
+    const runner = makeHappyRunner();
+    const { outcome } = install({ ...selfSignedParams, hysteriaSni: 'www.swift.com' }, runner);
+    await outcome;
+
+    const req = runner.calls.find((c) => c.startsWith('openssl req '));
+    if (!req) throw new Error('expected an "openssl req" call');
+    expect(req).toContain(shellQuote('/CN=www.swift.com'));
+    expect(req).toContain(shellQuote('subjectAltName=DNS:www.swift.com'));
   });
 
   it('skips installing openssl when it is already present', async () => {

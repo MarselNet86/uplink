@@ -19,7 +19,11 @@ export function buildVlessLink(params: VlessLinkParams): string {
     ['encryption', 'none'],
     ['flow', 'xtls-rprx-vision'],
     ['sni', params.sni],
-    ['fp', 'chrome'],
+    // firefox, не chrome: российские мобильные операторы режут TLS-хендшейк
+    // по отпечатку Chrome - TCP встаёт, дальше соединение убивают (в логе
+    // клиента `[EOF] > all retry attempts failed`). Замерено на живом сервере
+    // строгим чередованием запросов: chrome 0/8, firefox 8/8 в те же секунды.
+    ['fp', 'firefox'],
     ['pbk', params.publicKey],
     ['sid', params.shortId],
     ['spx', '/'],
@@ -40,20 +44,30 @@ export interface Hysteria2SelfSignedLinkParams {
 }
 
 /**
- * `self-signed` hy2:// link (tech.md 5.9). `insecure=1` is mandatory here:
- * without it the client validates against the system trust store and
- * fails with "unknown authority" for a cert nobody issued. `includePin`
- * defaults to true; set it false for the "link without pin" fallback some
- * clients need (KeyCard toggle) - a deliberate reduction of MITM protection.
+ * `self-signed` hy2:// link (tech.md 5.9), targeting Xray-core clients -
+ * INCY, Happ, v2rayN. Deliberately carries no `insecure`: Xray-core
+ * removed `allowInsecure` behind a hard date check that went live on
+ * 2026-06-01, and past it the whole config is refused, not just the one
+ * outbound. Reproduced verbatim against Xray 26.3.27:
+ *
+ *   Failed to start: ... Failed to build TLS config. > The feature
+ *   "allowInsecure" has been removed and migrated to "pinnedPeerCertSha256".
+ *
+ * `pinSHA256` is therefore load-bearing rather than optional - it is the
+ * only thing that lets a client accept a certificate nobody issued, and
+ * it verifies by fingerprint instead of by trust chain. A variant without
+ * it cannot connect at all, so no such variant is offered.
+ *
+ * The trade-off is deliberate: native hysteria and sing-box clients still
+ * *require* `insecure`, and pinning alone does not satisfy them (verified:
+ * they fail the handshake on x509 verification). Those clients are out of
+ * scope for this link; `acme-domain` mode serves them with a real
+ * certificate.
  */
-export function buildHysteria2SelfSignedLink(
-  params: Hysteria2SelfSignedLinkParams,
-  includePin = true,
-): string {
+export function buildHysteria2SelfSignedLink(params: Hysteria2SelfSignedLinkParams): string {
   const pairs: Array<[string, string]> = [
     ['sni', params.sni],
-    ['insecure', '1'],
-    ...(includePin ? ([['pinSHA256', params.fingerprintSha256]] as Array<[string, string]>) : []),
+    ['pinSHA256', params.fingerprintSha256],
   ];
   const query = pairs.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
   const userInfo = encodeURIComponent(params.password);
