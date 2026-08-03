@@ -621,6 +621,25 @@ body {
     border-top: 1px solid var(--rule);
     padding-top: var(--s2);
   }
+  /* Every action in a modal footer is one flat row of equal-weight choices,
+     not a page with a promoted primary path - all of them get the same
+     36px box as `.btn--danger` ("Удалить"), whatever variant they use for
+     colour elsewhere in the app. */
+  .modal-foot .btn--ghost {
+    border-color: var(--rule);
+    padding: 8px var(--s2);
+  }
+  .modal-foot .btn--ghost:hover:not([disabled]) {
+    border-color: var(--ink);
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .modal-foot .btn--primary {
+    min-height: 36px;
+    padding: 8px var(--s2);
+    letter-spacing: 0.2em;
+  }
 
   /* Vertical rhythm for a group of controls inside a modal or a panel. */
   .stack {
