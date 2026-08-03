@@ -73,6 +73,8 @@ export interface ProtocolStatus {
   state: ProtocolState;
   version?: string;
   serviceActive: boolean;
+  /** Connection link extracted from existing server config (only when state === 'installed'). */
+  link?: string;
 }
 
 export interface CheckRequest {

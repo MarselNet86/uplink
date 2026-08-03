@@ -120,6 +120,7 @@ export const protocolStatusSchema = z.object({
   state: protocolStateSchema,
   version: z.string().optional(),
   serviceActive: z.boolean(),
+  link: z.string().optional(),
 });
 
 export const checkResultSchema = z.object({

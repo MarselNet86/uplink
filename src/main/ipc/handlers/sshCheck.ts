@@ -10,6 +10,7 @@ import type { ErrorCode } from '@shared/errors';
 import { UnsupportedArchError, UnsupportedDistroError } from '../../domain/DistroDetector';
 import { Preflight } from '../../domain/Preflight';
 import { ProtocolDetector } from '../../domain/ProtocolDetector';
+import { TokenExtractor } from '../../domain/TokenExtractor';
 import { HostKeyStore } from '../../ssh/HostKeyStore';
 import { SshConnectError, SshSession } from '../../ssh/SshSession';
 import { registerSession } from '../../ssh/sessionRegistry';
@@ -77,13 +78,13 @@ export async function handleSshCheck(
   let distro: CheckResult['distro'];
   let protocols: CheckResult['protocols'];
   try {
-    const [preflightResult, protocolResult] = await Promise.all([
+    const [preflightResult, rawProtocols] = await Promise.all([
       new Preflight(runner).run(params, credentials.host),
       new ProtocolDetector(runner).detect(),
     ]);
     preflightItems = preflightResult.items;
     distro = preflightResult.distro;
-    protocols = protocolResult;
+    protocols = await new TokenExtractor(runner, credentials.host).enrichWithLinks(rawProtocols);
   } catch (err) {
     session.dispose();
     if (err instanceof UnsupportedDistroError) {
@@ -99,7 +100,7 @@ export async function handleSshCheck(
   const passed = items.every((item) => item.status !== 'fail');
 
   const sessionId = randomUUID();
-  registerSession(sessionId, session);
+  registerSession(sessionId, session, credentials.host);
 
   return {
     sessionId,
