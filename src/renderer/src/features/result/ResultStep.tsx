@@ -14,6 +14,9 @@ export interface ResultStepProps {
   onDone: () => void;
 }
 
+const INCY_DOWNLOAD_URL = 'https://github.com/INCY-DEV/incy-platforms';
+const SUBSCRIBE_URL = 'https://t.me/DaimonGRP';
+
 /**
  * Plain-text dump of everything useful for debugging: per-protocol error
  * code/message and the redacted diagnostics string from main. Meant to be
@@ -39,7 +42,6 @@ function buildDiagnosticsReport(result: RunResult): string {
 
 /** Step 4 (tech.md section 4): one KeyCard per successful protocol, an alert per failed one. Links are shown once and never persisted by the app itself. */
 export function ResultStep({ result, onDone }: ResultStepProps) {
-  const [copiedAll, setCopiedAll] = useState(false);
   const succeeded = result.outcomes.filter((o) => o.ok && o.link);
   // Removal/reinstall-without-a-fresh-link outcomes: ok, but nothing to show a KeyCard for.
   const succeededWithoutLink = result.outcomes.filter((o) => o.ok && !o.link);
@@ -49,18 +51,6 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
   // once dismissed - the report is still reachable under "Диагностика".
   const [errorDismissed, setErrorDismissed] = useState(false);
   const firstError = failed.find((o) => o.error)?.error ?? null;
-
-  const allLinksText = succeeded.map((o) => o.link).join('\n');
-
-  const copyAll = async () => {
-    await window.uplink.copyText(allLinksText);
-    setCopiedAll(true);
-    setTimeout(() => setCopiedAll(false), 2000);
-  };
-
-  const saveToFile = async () => {
-    await window.uplink.saveTextFile({ suggestedName: 'uplink-keys.txt', content: allLinksText });
-  };
 
   return (
     <>
@@ -99,9 +89,12 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
         />
       ))}
 
-      {result.warnings.length > 0 && (
-        <Alert tone="warn" title="Предупреждения">
-          {result.warnings.join(' ')}
+      {succeeded.length > 0 && (
+        <Alert tone="info" title="Финальный шаг">
+          Добавьте ссылки выше как подписку в прокси-клиент INCY. Скачать клиент для всех платформ:{' '}
+          <a href={INCY_DOWNLOAD_URL} target="_blank" rel="noreferrer">
+            {INCY_DOWNLOAD_URL}
+          </a>
         </Alert>
       )}
 
@@ -117,20 +110,10 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
         </Collapsible>
       )}
 
-      {succeeded.length > 0 && (
-        <div className="split-foot">
-          <Button variant="secondary" onClick={() => void saveToFile()}>
-            Сохранить в файл
-          </Button>
-          <Button variant="primary" onClick={() => void copyAll()}>
-            {copiedAll ? 'Скопировано' : 'Копировать всё'}
-          </Button>
-        </div>
-      )}
-
       <div className="split-foot">
-        <Button variant="ghost" onClick={onDone}>
-          Готово
+        <span />
+        <Button variant="primary" onClick={onDone}>
+          {`йоу спасибо, что используешь наше приложение. Подпишись: ${SUBSCRIBE_URL}`}
         </Button>
       </div>
 
