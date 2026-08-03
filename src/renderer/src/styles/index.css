@@ -966,6 +966,16 @@ body {
   .term-tag-val {
     color: var(--ink);
   }
+  /* The tag row itself stays click-through (it overlays the decorative
+     canvas), but the link inside it needs to take pointer events back. */
+  a.term-tag-val {
+    pointer-events: auto;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  a.term-tag-val:hover {
+    color: var(--muted);
+  }
   /* Wordmark is the panel's hero: set large and widely tracked so it reads
      as a plate stamped on the terminal rather than as body copy. */
   .term-wordmark {

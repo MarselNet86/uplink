@@ -23,20 +23,13 @@ const initialValues: ConnectFormValues = {
 
 export interface ConnectFormProps {
   onChecked: (result: CheckResult, params: DeployParams) => void;
-  /** Lets the surrounding screen mirror the probe in its own status readout. */
-  onProbingChange?: (probing: boolean) => void;
 }
 
-export function ConnectForm({ onChecked, onProbingChange }: ConnectFormProps) {
+export function ConnectForm({ onChecked }: ConnectFormProps) {
   const [values, setValues] = useState<ConnectFormValues>(initialValues);
   const [errors, setErrors] = useState<ConnectFormErrors>({});
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<AppError | null>(null);
-
-  const setProbing = (probing: boolean) => {
-    setLoading(probing);
-    onProbingChange?.(probing);
-  };
 
   const set = <K extends keyof ConnectFormValues>(key: K, value: ConnectFormValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -53,7 +46,7 @@ export function ConnectForm({ onChecked, onProbingChange }: ConnectFormProps) {
     setServerError(null);
     if (Object.keys(fieldErrors).length > 0) return;
 
-    setProbing(true);
+    setLoading(true);
     try {
       // Omitted rather than sent empty: exactOptionalPropertyTypes and the
       // zod schema both treat these as "absent means use the default".
@@ -85,7 +78,7 @@ export function ConnectForm({ onChecked, onProbingChange }: ConnectFormProps) {
     } catch (err) {
       setServerError(err as AppError);
     } finally {
-      setProbing(false);
+      setLoading(false);
     }
   };
 

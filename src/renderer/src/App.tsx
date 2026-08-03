@@ -115,24 +115,12 @@ export default function App() {
 
   const step = !checkResult ? 1 : !run ? 2 : !run.result ? 3 : 4;
 
-  // The readout mirrors real state on every step, the way it already did on
-  // step 1 - a status line that cannot be wrong is the point of having one.
-  const status =
-    step === 2
-      ? `СОЕДИНЕНО · ${checkResult?.distro.prettyName ?? '—'}`
-      : step === 3
-        ? `УСТАНОВКА · ${String(run?.percent ?? 0).padStart(2, '0')}%`
-        : run?.result?.outcomes.some((o) => !o.ok)
-          ? 'ЗАВЕРШЕНО С ОШИБКАМИ'
-          : 'ГОТОВО';
-
   return (
     <>
-      {/* Step 1 mounts its own shell so it can drive the status readout. */}
       {step === 1 && <ConnectScreen onChecked={handleChecked} />}
 
       {step !== 1 && (
-        <WizardShell step={step} status={status}>
+        <WizardShell step={step}>
           {step === 2 && checkResult && (
             <SelectStep
               result={checkResult}

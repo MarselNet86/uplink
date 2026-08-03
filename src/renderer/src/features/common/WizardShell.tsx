@@ -4,8 +4,6 @@ import { TerminalAside } from './TerminalAside';
 
 export interface WizardShellProps {
   step: 1 | 2 | 3 | 4;
-  /** Live status readout for the left pane. */
-  status: string;
   children: ReactNode;
 }
 
@@ -15,10 +13,10 @@ export interface WizardShellProps {
  * pane's content is swapped. Both panes are on the terminal treatment - the
  * app has a single visual style, not one per step.
  */
-export function WizardShell({ step, status, children }: WizardShellProps) {
+export function WizardShell({ step, children }: WizardShellProps) {
   return (
     <div className="split term">
-      <TerminalAside status={status} />
+      <TerminalAside />
       <div className="split-main">
         <Stepper current={step} />
         {children}
