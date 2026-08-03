@@ -4,17 +4,28 @@
  * Design tokens straight from docs/design-reference.html (design code,
  * version 1.1) - the pixel-level source of truth for every primitive.
  * Hairline 1px is the only structural device, no shadows, no gradients.
- * Radius has exactly two values: 0 for structure, 999px for controls.
- * Single light theme - the design code has no dark variant (tech.md v3).
+ *
+ * The palette is the terminal one, declared at the root rather than under a
+ * scope class: every surface in the app is on it, including the dialogs that
+ * portal outside the shell. A second palette is what let step 2 drift into a
+ * different look from step 1, so there is exactly one.
+ *
+ * There is no colour channel here. Depth is grey level, and the error state
+ * is carried by *brightness* (muted #555 -> full #fff) rather than by hue,
+ * which is why --oxide maps to white and not to a red.
+ *
+ * Fonts stay on the system mono stack deliberately: the renderer's CSP is
+ * `font-src 'self'` and no face is bundled, so a webfont would silently fail
+ * to a fallback. Personality comes from case, tracking and the ramp.
  */
 :root {
-  --paper: #efefee;
-  --well: #f6f6f5;
-  --ink: #161614;
-  --muted: #8e8e89;
-  --rule: #dcdcd8;
-  --oxide: #8c4a38;
-  --graphite: #3a3a37;
+  --paper: #000000;
+  --well: #0a0a0a;
+  --ink: #ffffff;
+  --muted: #767676;
+  --rule: #333333;
+  --oxide: #ffffff;
+  --graphite: #ffffff;
 
   --serif: 'Instrument Serif', Didot, 'Times New Roman', serif;
   --sans: 'Schibsted Grotesk', 'Helvetica Neue', Inter, Arial, sans-serif;
@@ -76,7 +87,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--sans);
+  font-family: var(--mono);
   font-size: var(--t-body);
   line-height: 1.5;
   font-weight: 400;
@@ -119,7 +130,7 @@ body {
   .eyebrow {
     font-size: var(--t-caption);
     text-transform: uppercase;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.18em;
     color: var(--muted);
     font-weight: 400;
   }
@@ -131,83 +142,120 @@ body {
     color: var(--muted);
   }
 
-  /* --- Button --- */
+  /*
+   * --- Button ---
+   * Every button is a bracketed command inside a hairline box. The bracket
+   * is the affordance: in a terminal it is what marks a run-able token, and
+   * an underlined label alone read as static text on this palette. Hit area
+   * is a real 36px box, not a text baseline.
+   */
   .btn {
-    font-family: inherit;
-    font-size: var(--t-small);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 8px var(--s2);
+    font-family: var(--mono);
+    font-size: var(--t-caption);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
     color: var(--ink);
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--ink);
-    padding: 0 0 4px;
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: var(--r-structure);
     cursor: pointer;
-    letter-spacing: 0.01em;
+    white-space: nowrap;
     transition:
-      opacity var(--dur) var(--ease),
-      border-color var(--dur) var(--ease);
+      background var(--dur) var(--ease),
+      border-color var(--dur) var(--ease),
+      color var(--dur) var(--ease);
   }
-  .btn:hover {
-    opacity: 0.55;
+  .btn::before {
+    content: '[ ';
+    color: var(--muted);
+  }
+  .btn::after {
+    content: ' ]';
+    color: var(--muted);
+  }
+  .btn:hover:not([disabled]) {
+    border-color: var(--ink);
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .btn:hover:not([disabled])::before,
+  .btn:hover:not([disabled])::after {
+    color: var(--ink);
+  }
+  .btn:active:not([disabled]) {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  /* Ghost drops the box but keeps the brackets, so it still reads as a
+     command - it is the quiet action, not an invisible one. */
+  .btn--ghost {
+    border-color: transparent;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .btn--ghost:hover:not([disabled]) {
+    border-color: transparent;
+    background: transparent;
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 4px;
   }
   .btn--secondary {
-    border-bottom-color: var(--rule);
     color: var(--muted);
   }
-  .btn--secondary:hover {
-    border-bottom-color: var(--ink);
+  .btn--secondary:hover:not([disabled]) {
     color: var(--ink);
-    opacity: 1;
-  }
-  .btn--ghost {
-    border-bottom-color: transparent;
-    color: var(--muted);
-  }
-  .btn--ghost:hover {
-    color: var(--ink);
-    opacity: 1;
   }
   .btn--danger {
     color: var(--oxide);
-    border-bottom-color: var(--oxide);
+    border-color: var(--oxide);
   }
   .btn[disabled] {
     color: var(--rule);
-    border-bottom-color: var(--rule);
+    border-color: #1e1e1e;
+    background: transparent;
     cursor: not-allowed;
     opacity: 1;
+  }
+  .btn[disabled]::before,
+  .btn[disabled]::after {
+    color: var(--rule);
   }
   .btn--loading {
     color: var(--muted);
-    border-bottom-color: var(--muted);
     cursor: progress;
   }
   .btn--loading::after {
-    content: ' \00b7\00b7\00b7';
-    font-family: var(--mono);
+    content: ' ··· ]';
     animation: uplink-pulse 1.2s var(--ease) infinite;
   }
+
+  /* Primary is the same command, promoted by a full-brightness frame and an
+     invert on hover - the only "filled" state in the whole app. */
   .btn--primary {
-    border: none;
-    border-radius: var(--r-control);
-    background: var(--graphite);
-    color: var(--paper);
-    padding: 14px var(--s4);
+    border-color: var(--ink);
+    padding: 12px var(--s3);
     min-height: 44px;
-    font-size: var(--t-small);
-    letter-spacing: 0.01em;
-    transition: background var(--dur) var(--ease);
+    letter-spacing: 0.22em;
   }
-  .btn--primary:hover {
+  .btn--primary:hover:not([disabled]) {
     background: var(--ink);
-    opacity: 1;
+    color: var(--paper);
+  }
+  .btn--primary:hover:not([disabled])::before,
+  .btn--primary:hover:not([disabled])::after {
+    color: var(--paper);
   }
   .btn--primary[disabled] {
-    background: var(--rule);
-    color: var(--paper);
-    cursor: not-allowed;
+    border-color: var(--rule);
+    color: var(--rule);
   }
   .btn--block {
-    display: block;
+    display: flex;
     width: 100%;
   }
 
@@ -221,7 +269,7 @@ body {
   .field-label {
     font-size: var(--t-caption);
     text-transform: uppercase;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.18em;
     color: var(--muted);
   }
   .field-input {
@@ -305,6 +353,11 @@ body {
   .check input:checked ~ .check-box {
     background: var(--ink);
   }
+  /* Empty box on black is easy to miss as a control; a tint on hover says
+     the whole row is hit-able. */
+  .check:hover input:not(:checked) ~ .check-box {
+    background: rgba(255, 255, 255, 0.22);
+  }
   .check input:focus-visible ~ .check-box {
     outline: 1px solid var(--ink);
     outline-offset: 2px;
@@ -357,11 +410,33 @@ body {
     font-size: var(--t-small);
     margin: 0 0 3px;
   }
+  /* With no colour channel, tone has to be carried by the glyph - the
+     hairline alone cannot tell a warning from a notice. */
+  .alert-title::before {
+    content: '[i] ';
+    color: var(--muted);
+  }
+  .alert--warn .alert-title::before {
+    content: '[~] ';
+  }
+  .alert--error .alert-title::before {
+    content: '[!] ';
+    color: var(--oxide);
+  }
   .alert-body {
     font-size: 11px;
     color: var(--muted);
     margin: 0;
     line-height: 1.5;
+  }
+  .alert-body a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    word-break: break-all;
+  }
+  .alert-body a:hover {
+    color: var(--muted);
   }
   .alert--warn {
     border-left-color: var(--muted);
@@ -371,12 +446,6 @@ body {
   }
   .alert--error .alert-title {
     color: var(--oxide);
-  }
-
-  /* --- Card: hairline box, tech.md section 9, no reference class exists --- */
-  .card {
-    border: 1px solid var(--rule);
-    padding: var(--s3);
   }
 
   /* --- Collapsible: +/- affordance --- */
@@ -389,20 +458,36 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: var(--s2);
     width: 100%;
     background: none;
     border: none;
     padding: 14px 0;
     cursor: pointer;
     font-family: inherit;
-    font-size: var(--t-small);
+    font-size: var(--t-caption);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
     color: var(--ink);
     text-align: left;
+    transition: color var(--dur) var(--ease);
   }
+  .coll-trigger:hover .coll-sign {
+    color: var(--ink);
+  }
+  /* The sign is the affordance here, so it gets its own bracketed frame
+     rather than being a bare glyph the eye can read as decoration. */
   .coll-sign {
-    font-family: var(--mono);
-    font-size: 13px;
+    font-size: 12px;
     color: var(--muted);
+    border: 1px solid var(--rule);
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    transition: color var(--dur) var(--ease);
   }
   .coll-panel {
     display: none;
@@ -429,13 +514,17 @@ body {
   .keycard-proto {
     font-size: var(--t-caption);
     text-transform: uppercase;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.18em;
   }
+  /* Same treatment as .node-link on step 2 - a key looks the same wherever
+     the app shows it. */
   .keycard-link {
-    font-family: var(--mono);
     font-size: 11px;
     line-height: 1.6;
     color: var(--ink);
+    background: var(--well);
+    border-left: 1px solid var(--rule);
+    padding: var(--s1) var(--s2);
     margin: var(--s2) 0 0;
     word-break: break-all;
   }
@@ -477,7 +566,7 @@ body {
   .modal-scrim {
     position: fixed;
     inset: 0;
-    background: rgba(22, 22, 20, 0.14);
+    background: rgba(0, 0, 0, 0.78);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -492,10 +581,15 @@ body {
     padding: var(--s3);
   }
   .modal-title {
-    font-size: var(--t-title);
+    font-size: var(--t-small);
     font-weight: 400;
-    margin: 0 0 var(--s1);
-    letter-spacing: -0.01em;
+    margin: 0 0 var(--s2);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .modal-title::before {
+    content: '// ';
+    color: var(--muted);
   }
   .modal-body {
     font-size: var(--t-small);
@@ -505,10 +599,54 @@ body {
   }
   .modal-foot {
     display: flex;
-    gap: var(--s3);
+    flex-wrap: wrap;
+    gap: var(--s2);
     justify-content: flex-end;
+    align-items: center;
     border-top: 1px solid var(--rule);
     padding-top: var(--s2);
+  }
+  /*
+   * A modal is a single decision, not a page with a primary path and
+   * secondary noise beside it - every button in its footer gets the exact
+   * box and weight of `.btn--primary` (Закрыть's own style), whatever
+   * variant it was given for use elsewhere in the app.
+   */
+  .modal-foot .btn {
+    min-height: 44px;
+    padding: 12px var(--s3);
+    letter-spacing: 0.22em;
+  }
+  .modal-foot .btn,
+  .modal-foot .btn--secondary,
+  .modal-foot .btn--ghost,
+  .modal-foot .btn--danger {
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+  .modal-foot .btn:hover:not([disabled]),
+  .modal-foot .btn--secondary:hover:not([disabled]),
+  .modal-foot .btn--ghost:hover:not([disabled]),
+  .modal-foot .btn--danger:hover:not([disabled]) {
+    background: var(--ink);
+    color: var(--paper);
+    text-decoration: none;
+  }
+  .modal-foot .btn:hover:not([disabled])::before,
+  .modal-foot .btn:hover:not([disabled])::after {
+    color: var(--paper);
+  }
+  .modal-foot .btn[disabled] {
+    border-color: var(--rule);
+    color: var(--rule);
+    background: transparent;
+  }
+
+  /* Vertical rhythm for a group of controls inside a modal or a panel. */
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
   }
 
   /* --- Progress --- */
@@ -606,22 +744,6 @@ body {
     grid-template-columns: 38% 1fr;
     height: 100%;
   }
-  .split-aside {
-    position: relative;
-    padding: var(--s3);
-    display: flex;
-    align-items: flex-end;
-    background: linear-gradient(168deg, #c9cdcb 0%, #b0b7b2 40%, #8a938c 72%, #697269 100%);
-    border-right: 1px solid var(--rule);
-  }
-  .split-caption {
-    font-size: var(--t-caption);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: rgba(255, 255, 255, 0.92);
-    line-height: 1.7;
-    max-width: 30ch;
-  }
   .split-main {
     padding: var(--s3);
     display: flex;
@@ -629,65 +751,250 @@ body {
     gap: var(--s3);
     overflow-y: auto;
   }
-  .split-brand {
-    font-family: var(--serif);
-    font-size: 19px;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    line-height: 1;
-  }
+  /* Section heads read as source comments, the vernacular of the medium. */
   .split-h {
-    font-size: var(--t-title);
+    font-size: var(--t-small);
     font-weight: 400;
     margin: 0;
-    letter-spacing: -0.01em;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .split-h::before {
+    content: '// ';
+    color: var(--muted);
   }
   .split-foot {
     margin-top: auto;
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
-    align-items: flex-end;
+    align-items: center;
     gap: var(--s2);
     padding-top: var(--s3);
     border-top: 1px solid var(--rule);
   }
-
-  /* --- Protocol pick cells (step 2, design code 06) --- */
-  .picks {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+  /* Footer notes wrap; the action next to them never shrinks. */
+  .split-foot .eyebrow {
+    max-width: 44ch;
+    line-height: 1.7;
+  }
+  /*
+   * --- Readout: label/value rows -----------------------------------------
+   * The same left-label/right-value rhythm the form fields have, for data
+   * the user reads instead of types (system info, preflight checks).
+   */
+  .readout {
+    margin: 0;
     border-top: 1px solid var(--rule);
-    border-left: 1px solid var(--rule);
   }
-  .pick {
-    border-right: 1px solid var(--rule);
-    border-bottom: 1px solid var(--rule);
-    padding: var(--s2);
-    min-height: 140px;
+  .readout-row {
     display: flex;
-    flex-direction: column;
     justify-content: space-between;
-    position: relative;
+    align-items: baseline;
+    gap: var(--s2);
+    padding: 9px 0;
+    border-bottom: 1px solid var(--rule);
   }
-  .pick-mark {
-    position: absolute;
-    top: var(--s2);
-    right: var(--s2);
-    font-family: var(--mono);
-    font-size: 13px;
+  .readout-row dt {
+    font-size: var(--t-caption);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .readout-row dd {
+    margin: 0;
+    font-size: var(--t-small);
+    color: var(--ink);
+    text-align: right;
+    word-break: break-word;
+  }
+  .readout-glyph {
     color: var(--muted);
   }
-  .pick-name {
-    font-size: var(--t-small);
+  .readout-row[data-status='ok'] .readout-glyph {
+    color: var(--ink);
   }
-  .pick-meta {
+  .readout-row[data-status='fail'] dt,
+  .readout-row[data-status='fail'] .readout-glyph {
+    color: var(--oxide);
+  }
+
+  /*
+   * --- Node cards (step 2) -----------------------------------------------
+   * One protocol per block: identifier line, status glyph, the key already
+   * on the server when there is one, then the action row.
+   */
+  .node-list {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--rule);
+  }
+  .node {
+    padding: var(--s3) 0;
+    border-bottom: 1px solid var(--rule);
+    border-left: 1px solid transparent;
+    padding-left: 0;
+    transition:
+      border-color var(--dur) var(--ease),
+      padding-left var(--dur) var(--ease);
+  }
+  /* A queued node is marked on the rail, so the selection survives the
+     glance that the checkbox alone loses at this density. */
+  .node[data-active='true'] {
+    border-left-color: var(--ink);
+    padding-left: var(--s2);
+  }
+  .node-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--s2);
+    margin-bottom: var(--s2);
+  }
+  .node-title {
+    font-size: var(--t-small);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .node-id {
+    color: var(--muted);
+  }
+  .node-port {
+    font-size: var(--t-caption);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .node-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: var(--s2);
+  }
+  .node-glyph {
+    font-size: var(--t-small);
+    flex: none;
+  }
+  .node-glyph--on {
+    color: var(--ink);
+  }
+  .node-glyph--off {
+    color: var(--muted);
+  }
+  .node-glyph--warn {
+    color: var(--oxide);
+  }
+  .node-status-label {
+    font-size: var(--t-caption);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .node-label {
+    font-size: var(--t-caption);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 6px;
+  }
+  .node-link {
+    font-size: 11px;
+    word-break: break-all;
+    color: var(--ink);
+    background: var(--well);
+    border-left: 1px solid var(--rule);
+    padding: var(--s1) var(--s2);
+    margin: 0 0 var(--s2);
+    line-height: 1.6;
+  }
+  .node-meta {
     font-size: 11px;
     color: var(--muted);
     line-height: 1.5;
+    margin: 0 0 var(--s2);
   }
-  .pick--off .pick-name,
-  .pick--off .pick-meta {
-    color: var(--rule);
+  .node-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s2);
+  }
+}
+
+/*
+ * ── Terminal shell ──────────────────────────────────────────────────────
+ * The frame every screen sits in. The palette itself lives at :root, so
+ * what remains here is the shell's own furniture: the ASCII pane on the
+ * left and the scanline field behind the content on the right.
+ */
+@layer components {
+  .term {
+    background: var(--paper);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* --- Left pane: full-bleed canvas with corner readouts --- */
+  .term-aside {
+    position: relative;
+    overflow: hidden;
+    background: #000;
+    border-right: 1px solid #1a1a1a;
+  }
+  .term-canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+  }
+  .term-tag {
+    position: absolute;
+    left: var(--s3);
+    right: var(--s3);
+    z-index: 2;
+    font-size: var(--t-caption);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #6a6a6a;
+    line-height: 1.9;
+    pointer-events: none;
+  }
+  .term-tag--bottom {
+    bottom: var(--s3);
+  }
+  .term-tag-val {
+    color: var(--ink);
+  }
+  /* Wordmark is the panel's hero: set large and widely tracked so it reads
+     as a plate stamped on the terminal rather than as body copy. */
+  .term-wordmark {
+    position: absolute;
+    top: var(--s3);
+    left: var(--s3);
+    right: var(--s3);
+    z-index: 2;
+    margin: 0;
+    font-size: clamp(26px, 4.4vw, 46px);
+    font-weight: 400;
+    letter-spacing: 0.26em;
+    line-height: 1;
+    color: var(--ink);
+    /* Tracking adds a trailing gap after the last glyph; pull it back so the
+       mark stays optically flush with the readout below it. */
+    text-indent: 0.13em;
+    pointer-events: none;
+  }
+
+  /* --- Right pane: scanlines under the content, never over the glyphs --- */
+  .term .split-main {
+    background-color: var(--paper);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.022) 0 1px,
+      transparent 1px 4px
+    );
   }
 }
 

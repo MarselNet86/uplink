@@ -67,7 +67,7 @@ export function ConflictModal({ open, found, onClose, onRemove, onReinstall }: C
       <p style={{ marginBottom: 'var(--s2)' }}>
         Переустановка выдаст новые ключи, старые ссылки перестанут работать.
       </p>
-      <div className="comp-stack">
+      <div className="stack">
         {found.map((status) => (
           <Checkbox
             key={status.protocol}

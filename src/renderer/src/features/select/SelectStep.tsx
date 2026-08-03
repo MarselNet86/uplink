@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import type { CheckResult, ProtocolId } from '@shared/types';
+import type { CheckId, CheckResult, ProtocolId, ProtocolState } from '@shared/types';
 import { PlanBuilder } from '@shared/planBuilder';
-import { Alert } from '../../ui/Alert';
-import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Checkbox } from '../../ui/Checkbox';
-import { cn } from '../../ui/lib/utils';
-import { PROTOCOL_BADGE, PROTOCOL_PORT, PROTOCOL_TITLE, protocolMeta } from './protocolCopy';
+import { Collapsible } from '../../ui/Collapsible';
+import { CopyButton } from '../../ui/CopyButton';
+import { PROTOCOL_PORT, PROTOCOL_TITLE } from './protocolCopy';
 
 export interface SelectStepProps {
   result: CheckResult;
@@ -15,11 +14,45 @@ export interface SelectStepProps {
   onInstall: (protocols: ProtocolId[]) => void;
 }
 
-/**
- * Step 2 (tech.md section 4): a checkbox per protocol, disabled unless
- * `absent`; anything already found only offers "Управление" into the
- * conflict modal. Install stays inert until the pipeline lands in stage 5.
- */
+const PROTOCOL_INDEX: Record<ProtocolId, string> = {
+  'vless-reality': '01',
+  hysteria2: '02',
+};
+
+const PROTOCOL_DESC: Record<ProtocolId, string> = {
+  'vless-reality': 'Маскировка под чужой TLS. Домен не нужен.',
+  hysteria2: 'Самоподписанный сертификат. Домен не нужен.',
+};
+
+const STATE_GLYPH: Record<ProtocolState, string> = {
+  installed: '[+]',
+  broken: '[!]',
+  absent: '[ ]',
+  foreign: '[?]',
+};
+
+const STATE_LABEL: Record<ProtocolState, string> = {
+  installed: 'УСТАНОВЛЕН · АКТИВЕН',
+  broken: 'НЕ ЗАПУЩЕН',
+  absent: 'ОТСУТСТВУЕТ',
+  foreign: 'ЧУЖОЙ КОНФИГ',
+};
+
+const CHECK_LABEL: Record<CheckId, string> = {
+  tcp: 'TCP',
+  auth: 'АВТОРИЗАЦИЯ',
+  privileges: 'ПРАВА ROOT',
+  distro: 'ДИСТРИБУТИВ',
+  arch: 'АРХИТЕКТУРА',
+  systemd: 'SYSTEMD',
+  outbound: 'ИСХОДЯЩИЙ ДОСТУП',
+  ports: 'ПОРТЫ',
+  dns: 'DNS',
+  'apt-lock': 'БЛОКИРОВКА APT',
+};
+
+const CHECK_GLYPH = { ok: '[+]', warn: '[~]', fail: '[!]' } as const;
+
 export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepProps) {
   const picks = PlanBuilder.derivePicks(result.protocols);
   const [selected, setSelected] = useState<Set<ProtocolId>>(
@@ -36,54 +69,109 @@ export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepPr
   };
 
   const plan = PlanBuilder.buildInstallPlan(Array.from(selected), result.protocols);
-  const hasManageable = picks.some((p) => p.manageable);
+  const okCount = result.preflight.items.filter((item) => item.status === 'ok').length;
 
   return (
     <>
-      <div>
-        <h3 className="split-h">Что поставить</h3>
-        <p className="field-hint" style={{ marginTop: 6 }}>
-          {result.distro.prettyName} · {result.distro.arch} · systemd{' '}
-          {result.distro.hasSystemd ? 'есть' : 'нет'}
-        </p>
-      </div>
+      <h3 className="split-h">Протоколы</h3>
 
-      <div className="picks">
+      {/* Same shape as the fields on step 1: label left, value right, one
+          hairline per row - the server readout is data, not prose. */}
+      <dl className="readout">
+        <div className="readout-row">
+          <dt>СИСТЕМА</dt>
+          <dd>{result.distro.prettyName}</dd>
+        </div>
+        <div className="readout-row">
+          <dt>АРХИТЕКТУРА</dt>
+          <dd>{result.distro.arch}</dd>
+        </div>
+        <div className="readout-row">
+          <dt>SYSTEMD</dt>
+          <dd>{result.distro.hasSystemd ? 'ЕСТЬ' : 'НЕТ'}</dd>
+        </div>
+      </dl>
+
+      <div className="node-list">
         {picks.map((pick) => {
           const status = result.protocols.find((p) => p.protocol === pick.protocol);
-          const badge = status ? PROTOCOL_BADGE[status.state] : undefined;
+          const state = status?.state ?? 'absent';
+          const link = status?.link;
+          const isOn = state === 'installed';
+          const isWarn = state === 'broken' || state === 'foreign';
+          const checked = selected.has(pick.protocol);
+
           return (
-            <div key={pick.protocol} className={cn('pick', pick.disabled && 'pick--off')}>
-              <span className="pick-mark">{pick.disabled ? '−' : '+'}</span>
-              <div>
-                <div className="pick-name">{PROTOCOL_TITLE[pick.protocol]}</div>
-                <p className="pick-meta">{status && protocolMeta(pick.protocol, status.state)}</p>
+            <div
+              key={pick.protocol}
+              className="node"
+              data-active={!pick.manageable && checked ? 'true' : undefined}
+            >
+              <div className="node-head">
+                <div className="node-title">
+                  <span className="node-id">{`NODE_${PROTOCOL_INDEX[pick.protocol]} // `}</span>
+                  {PROTOCOL_TITLE[pick.protocol]}
+                </div>
+                <span className="node-port">{PROTOCOL_PORT[pick.protocol]}</span>
               </div>
+
+              <div className="node-status">
+                <span
+                  className={
+                    isOn
+                      ? 'node-glyph node-glyph--on'
+                      : isWarn
+                        ? 'node-glyph node-glyph--warn'
+                        : 'node-glyph node-glyph--off'
+                  }
+                >
+                  {STATE_GLYPH[state]}
+                </span>
+                <span className="node-status-label">{STATE_LABEL[state]}</span>
+              </div>
+
+              {link && (
+                <>
+                  <p className="node-label">КЛЮЧ ДОСТУПА С СЕРВЕРА</p>
+                  <p className="node-link">{link}</p>
+                </>
+              )}
+
               {pick.manageable ? (
-                <div className="comp-row">
-                  {badge?.label && <Badge tone={badge.tone}>{badge.label}</Badge>}
-                  <Button variant="ghost" onClick={() => onManage(pick.protocol)}>
+                <div className="node-foot">
+                  {link ? <CopyButton value={link} /> : <span />}
+                  <Button variant="secondary" onClick={() => onManage(pick.protocol)}>
                     Управление
                   </Button>
                 </div>
               ) : (
-                <Checkbox
-                  checked={selected.has(pick.protocol)}
-                  onCheckedChange={(checked) => toggle(pick.protocol, checked)}
-                  label={`Установить · ${PROTOCOL_PORT[pick.protocol]}`}
-                />
+                <>
+                  <p className="node-meta">{PROTOCOL_DESC[pick.protocol]}</p>
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(next) => toggle(pick.protocol, next)}
+                    label={`Установить · ${PROTOCOL_PORT[pick.protocol]}`}
+                  />
+                </>
               )}
             </div>
           );
         })}
       </div>
 
-      {hasManageable && (
-        <Alert tone="warn" title="Часть протоколов уже найдена на сервере">
-          Переустановка или удаление выполняются через «Управление» - установка новых протоколов их
-          не затрагивает.
-        </Alert>
-      )}
+      <Collapsible title={`Проверки сервера · ${okCount}/${result.preflight.items.length}`}>
+        <dl className="readout">
+          {result.preflight.items.map((item) => (
+            <div key={item.id} className="readout-row" data-status={item.status}>
+              <dt>
+                <span className="readout-glyph">{CHECK_GLYPH[item.status]}</span>{' '}
+                {CHECK_LABEL[item.id]}
+              </dt>
+              <dd>{item.detail ?? (item.status === 'ok' ? 'ОК' : '—')}</dd>
+            </div>
+          ))}
+        </dl>
+      </Collapsible>
 
       <div className="split-foot">
         <Button variant="secondary" onClick={onBack}>

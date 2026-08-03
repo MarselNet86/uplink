@@ -62,9 +62,14 @@ export function InstallStep() {
         </Collapsible>
       )}
 
+      {/* The warning is a note, not a label: as button text it made the
+          control grow to a paragraph and stop looking like a button. */}
       <div className="split-foot">
+        <span className="eyebrow">
+          {cancelling ? 'Прерывание может оставить сервер в промежуточном состоянии' : ''}
+        </span>
         <Button variant="secondary" onClick={handleCancel} disabled={cancelling}>
-          {cancelling ? 'Прерывание может оставить сервер в промежуточном состоянии' : 'Отмена'}
+          {cancelling ? 'Прерываю' : 'Отмена'}
         </Button>
       </div>
     </>

@@ -4,5 +4,6 @@ dist
 build
 .npm-cache
 docs/design-reference.html
+docs/oasis-terminal-grid.html
 tech.md
 .claude
