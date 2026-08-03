@@ -4,7 +4,7 @@ import { is } from '@electron-toolkit/utils';
 import { registerIpcHandlers } from './ipc/registry';
 
 /** Domains allowed to be opened in the OS browser via shell.openExternal. */
-const EXTERNAL_URL_ALLOWLIST = new Set<string>([]);
+const EXTERNAL_URL_ALLOWLIST = new Set<string>(['github.com', 't.me']);
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
