@@ -189,11 +189,3 @@ export const demoPingResponseSchema = z.object({
 
 export type DemoPingRequest = z.infer<typeof demoPingRequestSchema>;
 export type DemoPingResponse = z.infer<typeof demoPingResponseSchema>;
-
-/** file:saveText payload - suggested filename plus the plain-text content to write. */
-export const saveTextFileRequestSchema = z.object({
-  suggestedName: z.string().min(1),
-  content: z.string().min(1),
-});
-
-export type SaveTextFileRequest = z.infer<typeof saveTextFileRequestSchema>;
