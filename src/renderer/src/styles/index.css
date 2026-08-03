@@ -343,20 +343,32 @@ body {
     height: 0;
   }
   .check-box {
-    width: 11px;
-    height: 11px;
+    position: relative;
+    width: 14px;
+    height: 14px;
     border: 1px solid var(--ink);
     flex: none;
-    margin-top: 5px;
-    transition: background var(--dur) var(--ease);
+    margin-top: 4px;
+    transition: border-color var(--dur) var(--ease);
   }
-  .check input:checked ~ .check-box {
+  /* The box itself never fills - only a smaller square appears inside it.
+     A box that goes solid on check is easy to misread at a glance as "just
+     a hover tint"; a square-inside-a-square reads as on/off unambiguously. */
+  .check-box::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
     background: var(--ink);
+    opacity: 0;
+    transition: opacity var(--dur) var(--ease);
+  }
+  .check input:checked ~ .check-box::after {
+    opacity: 1;
   }
   /* Empty box on black is easy to miss as a control; a tint on hover says
      the whole row is hit-able. */
   .check:hover input:not(:checked) ~ .check-box {
-    background: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.14);
   }
   .check input:focus-visible ~ .check-box {
     outline: 1px solid var(--ink);
@@ -377,6 +389,9 @@ body {
   }
   .check--off .check-box {
     border-color: var(--rule);
+  }
+  .check--off .check-box::after {
+    background: var(--rule);
   }
   .check--off .check-text {
     color: var(--rule);
@@ -605,41 +620,6 @@ body {
     align-items: center;
     border-top: 1px solid var(--rule);
     padding-top: var(--s2);
-  }
-  /*
-   * A modal is a single decision, not a page with a primary path and
-   * secondary noise beside it - every button in its footer gets the exact
-   * box and weight of `.btn--primary` (Закрыть's own style), whatever
-   * variant it was given for use elsewhere in the app.
-   */
-  .modal-foot .btn {
-    min-height: 44px;
-    padding: 12px var(--s3);
-    letter-spacing: 0.22em;
-  }
-  .modal-foot .btn,
-  .modal-foot .btn--secondary,
-  .modal-foot .btn--ghost,
-  .modal-foot .btn--danger {
-    border-color: var(--ink);
-    color: var(--ink);
-  }
-  .modal-foot .btn:hover:not([disabled]),
-  .modal-foot .btn--secondary:hover:not([disabled]),
-  .modal-foot .btn--ghost:hover:not([disabled]),
-  .modal-foot .btn--danger:hover:not([disabled]) {
-    background: var(--ink);
-    color: var(--paper);
-    text-decoration: none;
-  }
-  .modal-foot .btn:hover:not([disabled])::before,
-  .modal-foot .btn:hover:not([disabled])::after {
-    color: var(--paper);
-  }
-  .modal-foot .btn[disabled] {
-    border-color: var(--rule);
-    color: var(--rule);
-    background: transparent;
   }
 
   /* Vertical rhythm for a group of controls inside a modal or a panel. */

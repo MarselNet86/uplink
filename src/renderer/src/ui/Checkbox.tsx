@@ -9,7 +9,7 @@ export interface CheckboxProps {
   className?: string;
 }
 
-/** Square outline, ink fill, no tick icon (design code 05). */
+/** Square outline; checked state shows a smaller square inside it, no tick icon. */
 export function Checkbox({
   checked,
   onCheckedChange,
