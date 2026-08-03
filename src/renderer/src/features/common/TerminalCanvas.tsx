@@ -2,7 +2,9 @@ import { useEffect, useRef } from 'react';
 
 /**
  * ASCII soil bed with a sprout germinating out of it, ported from the
- * "Oasis Terminal Grid" reference to a self-contained canvas component.
+ * "Oasis Terminal Grid" reference to a self-contained canvas component. The
+ * sprout blooms into the kurai - the seven-stemmed plant on Bashkortostan's
+ * emblem - rather than a generic flower or tree crown.
  *
  * The metaphor is the screen's actual job: a server is planted and grows.
  * Everything is drawn in the monochrome ramp - no colour channel exists in
@@ -18,8 +20,9 @@ const FPS = 24;
 const GROW_MS = 12_000;
 const SEED_DELAY_MS = 1_500;
 
-/** Offsets from the root cell, with the progress value at which each block appears. */
-const SPROUT: ReadonlyArray<{ x: number; y: number; t: number }> = [
+type Block = { x: number; y: number; t: number };
+
+const TRUNK: ReadonlyArray<Block> = [
   { x: 0, y: 0, t: 0.05 },
   { x: 0, y: -1, t: 0.1 },
   { x: 0, y: -2, t: 0.15 },
@@ -28,25 +31,61 @@ const SPROUT: ReadonlyArray<{ x: number; y: number; t: number }> = [
   { x: 0, y: -5, t: 0.3 },
   { x: 0, y: -6, t: 0.35 },
   { x: 0, y: -7, t: 0.4 },
-  // left leaf
-  { x: -1, y: -4, t: 0.5 },
-  { x: -2, y: -5, t: 0.55 },
-  { x: -3, y: -5, t: 0.6 },
-  { x: -2, y: -4, t: 0.62 },
-  // right leaf
-  { x: 1, y: -5, t: 0.52 },
-  { x: 2, y: -6, t: 0.57 },
-  { x: 3, y: -6, t: 0.62 },
-  { x: 2, y: -5, t: 0.64 },
-  // crown
-  { x: -1, y: -8, t: 0.75 },
-  { x: 1, y: -8, t: 0.75 },
-  { x: 0, y: -9, t: 0.8 },
-  { x: -1, y: -10, t: 0.85 },
-  { x: 1, y: -10, t: 0.85 },
-  { x: 0, y: -11, t: 0.9 },
-  { x: 0, y: -13, t: 0.98 },
 ];
+
+/** Where the trunk ends and the fan of blooms opens - must match TRUNK's last cell. */
+const HUB = { x: 0, y: -7 };
+
+/**
+ * The kurai emblem of Bashkortostan: one stem splitting into seven blooms
+ * fanned across a half-circle - 0/30/60/90/120/150/180 degrees off the
+ * horizontal - each ray tipped with a round bud, mirroring the seven
+ * ancestral clans radiating from a single root. The angles are the entire
+ * likeness here, so they are generated from trigonometry rather than
+ * hand-placed, to keep the fan exactly symmetric instead of "close enough".
+ */
+function buildKuraiCrown(hub: { x: number; y: number }): Block[] {
+  const RAY_LENGTH = 10;
+  const RAY_ANGLES_DEG = [0, 30, 60, 90, 120, 150, 180];
+  const blocks: Block[] = [];
+
+  for (const deg of RAY_ANGLES_DEG) {
+    const rad = (deg * Math.PI) / 180;
+    const dirX = Math.cos(rad);
+    const dirY = -Math.sin(rad);
+    // Blooms open outward from the centre ray, not left-to-right.
+    const spread = Math.abs(deg - 90) / 90;
+    const rayStart = 0.45 + spread * 0.25;
+
+    // Stop short of the tip - the bud below is a solid block sitting on the
+    // ray's end, not merged into it, so the "thin stem, round head" shape
+    // actually reads instead of thickening into a leaf lobe.
+    for (let step = 1; step < RAY_LENGTH - 1; step++) {
+      blocks.push({
+        x: hub.x + Math.round(dirX * step),
+        y: hub.y + Math.round(dirY * step),
+        t: rayStart + (step / RAY_LENGTH) * 0.15,
+      });
+    }
+
+    // The bud is a solid 3x3 block, deliberately wider than the 1-cell ray -
+    // at this grid size a single cell or a thin cross still reads as "line
+    // ending", not "round head", so it needs the extra bulk.
+    const tipX = hub.x + Math.round(dirX * RAY_LENGTH);
+    const tipY = hub.y + Math.round(dirY * RAY_LENGTH);
+    const budT = rayStart + 0.18;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        blocks.push({ x: tipX + dx, y: tipY + dy, t: budT });
+      }
+    }
+  }
+
+  return blocks;
+}
+
+/** Offsets from the root cell, with the progress value at which each block appears. */
+const SPROUT: ReadonlyArray<Block> = [...TRUNK, ...buildKuraiCrown(HUB)];
 
 function noise(x: number, y: number, t: number): number {
   return Math.sin(x * 0.1 + t) + Math.cos(y * 0.1 - t) + Math.sin((x + y) * 0.05 + t * 0.5);
