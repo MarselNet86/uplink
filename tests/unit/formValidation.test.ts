@@ -36,7 +36,6 @@ describe('deriveAutoAcmeEmail', () => {
 
 describe('validateConnectForm - domain fields', () => {
   const base: ConnectFormValues = {
-    distroHint: 'auto',
     host: '89.124.66.71',
     port: '22',
     username: 'root',

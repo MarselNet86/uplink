@@ -5,13 +5,11 @@ import { Checkbox } from '../../ui/Checkbox';
 import { Collapsible } from '../../ui/Collapsible';
 import { Input } from '../../ui/Input';
 import { PasswordInput } from '../../ui/PasswordInput';
-import { Select } from '../../ui/Select';
 import { ErrorDetailsModal } from '../common/ErrorDetailsModal';
 import { deriveAutoAcmeEmail, deriveAutoDomain, validateConnectForm } from './formValidation';
 import type { ConnectFormErrors, ConnectFormValues } from './formValidation';
 
 const initialValues: ConnectFormValues = {
-  distroHint: 'auto',
   host: '',
   port: '22',
   username: 'root',
@@ -25,13 +23,20 @@ const initialValues: ConnectFormValues = {
 
 export interface ConnectFormProps {
   onChecked: (result: CheckResult, params: DeployParams) => void;
+  /** Lets the surrounding screen mirror the probe in its own status readout. */
+  onProbingChange?: (probing: boolean) => void;
 }
 
-export function ConnectForm({ onChecked }: ConnectFormProps) {
+export function ConnectForm({ onChecked, onProbingChange }: ConnectFormProps) {
   const [values, setValues] = useState<ConnectFormValues>(initialValues);
   const [errors, setErrors] = useState<ConnectFormErrors>({});
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<AppError | null>(null);
+
+  const setProbing = (probing: boolean) => {
+    setLoading(probing);
+    onProbingChange?.(probing);
+  };
 
   const set = <K extends keyof ConnectFormValues>(key: K, value: ConnectFormValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -48,7 +53,7 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
     setServerError(null);
     if (Object.keys(fieldErrors).length > 0) return;
 
-    setLoading(true);
+    setProbing(true);
     try {
       // Omitted rather than sent empty: exactOptionalPropertyTypes and the
       // zod schema both treat these as "absent means use the default".
@@ -62,15 +67,11 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
         : domain
           ? deriveAutoAcmeEmail(domain)
           : '';
+      // Distro is always auto-detected server-side (Preflight); the form
+      // never asked the user for it, so there is nothing to override here.
       const params: DeployParams = domain
-        ? {
-            distroHint: values.distroHint,
-            tlsMode: 'acme-domain',
-            domain,
-            acmeEmail,
-            ...sni,
-          }
-        : { distroHint: values.distroHint, tlsMode: 'self-signed', ...sni };
+        ? { distroHint: 'auto', tlsMode: 'acme-domain', domain, acmeEmail, ...sni }
+        : { distroHint: 'auto', tlsMode: 'self-signed', ...sni };
       const result = await window.uplink.sshCheck({
         credentials: {
           host: values.host.trim(),
@@ -84,7 +85,7 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
     } catch (err) {
       setServerError(err as AppError);
     } finally {
-      setLoading(false);
+      setProbing(false);
     }
   };
 
@@ -125,17 +126,6 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
           error={errors.password}
         />
       </div>
-
-      <Select
-        label="Дистрибутив"
-        value={values.distroHint}
-        onChange={(v) => set('distroHint', v as ConnectFormValues['distroHint'])}
-        options={[
-          { value: 'auto', label: 'Определить автоматически' },
-          { value: 'debian', label: 'Debian' },
-          { value: 'ubuntu', label: 'Ubuntu' },
-        ]}
-      />
 
       <Collapsible title="Домен для Hysteria2 · автоматически">
         <p className="field-hint" style={{ marginBottom: 'var(--s2)' }}>

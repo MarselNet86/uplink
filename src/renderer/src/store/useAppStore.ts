@@ -8,8 +8,6 @@ import type {
   StepView,
 } from '@shared/types';
 
-export type RouteId = 'wizard' | 'kitchen-sink';
-
 interface RunState {
   runId: string;
   steps: StepView[];
@@ -27,8 +25,6 @@ interface FatalError {
 }
 
 interface AppState {
-  route: RouteId;
-  setRoute: (route: RouteId) => void;
   fatalError: FatalError | null;
   setFatalError: (fatal: FatalError | null) => void;
   checkResult: CheckResult | null;
@@ -47,8 +43,6 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  route: 'wizard',
-  setRoute: (route) => set({ route }),
   fatalError: null,
   setFatalError: (fatalError) => set({ fatalError }),
   checkResult: null,

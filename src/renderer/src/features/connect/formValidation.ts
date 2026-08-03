@@ -2,7 +2,6 @@
  * schemas validate the same payload again at the IPC boundary; this layer
  * only exists to show inline hints before a round trip to main. */
 export interface ConnectFormValues {
-  distroHint: 'auto' | 'debian' | 'ubuntu';
   host: string;
   port: string;
   username: string;

@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import type { AppError, CheckResult, DeployParams, ProtocolId } from '@shared/types';
 import { useAppStore } from './store/useAppStore';
 import { ErrorDetailsModal } from './features/common/ErrorDetailsModal';
-import { KitchenSink } from './features/common/KitchenSink';
 import { WizardShell } from './features/common/WizardShell';
-import { ConnectForm } from './features/connect/ConnectForm';
+import { ConnectScreen } from './features/connect/ConnectScreen';
 import { HostKeyPromptModal } from './features/connect/HostKeyPromptModal';
 import { InstallStep } from './features/install/InstallStep';
 import { ConflictModal } from './features/manage/ConflictModal';
@@ -12,8 +11,6 @@ import { ResultStep } from './features/result/ResultStep';
 import { SelectStep } from './features/select/SelectStep';
 
 export default function App() {
-  const route = useAppStore((state) => state.route);
-  const setRoute = useAppStore((state) => state.setRoute);
   const checkResult = useAppStore((state) => state.checkResult);
   const setCheckResult = useAppStore((state) => state.setCheckResult);
   const setProtocols = useAppStore((state) => state.setProtocols);
@@ -118,32 +115,24 @@ export default function App() {
 
   const step = !checkResult ? 1 : !run ? 2 : !run.result ? 3 : 4;
 
-  const caption =
-    step === 1
-      ? 'Собственный сервер, два протокола, ни одного ручного конфига. Домен не требуется.'
-      : step === 2
-        ? 'Reality занимает 443 по TCP, Hysteria2 — 443 по UDP. Ставятся вместе.'
-        : step === 3
-          ? 'Каждый шаг идемпотентен и проверяем перед переходом к следующему.'
-          : run?.result?.outcomes.some((o) => o.ok && o.link)
-            ? 'Сохраните ссылки сейчас — приложение их больше не покажет.'
-            : 'Готово — можно вернуться и проверить сервер ещё раз.';
+  // The readout mirrors real state on every step, the way it already did on
+  // step 1 - a status line that cannot be wrong is the point of having one.
+  const status =
+    step === 2
+      ? `СОЕДИНЕНО · ${checkResult?.distro.prettyName ?? '—'}`
+      : step === 3
+        ? `УСТАНОВКА · ${String(run?.percent ?? 0).padStart(2, '0')}%`
+        : run?.result?.outcomes.some((o) => !o.ok)
+          ? 'ЗАВЕРШЕНО С ОШИБКАМИ'
+          : 'ГОТОВО';
 
   return (
     <>
-      <button
-        type="button"
-        className="eyebrow fixed right-2 top-2 z-50 cursor-pointer bg-transparent"
-        onClick={() => setRoute(route === 'wizard' ? 'kitchen-sink' : 'wizard')}
-      >
-        {route === 'wizard' ? 'kitchen sink' : 'wizard'}
-      </button>
+      {/* Step 1 mounts its own shell so it can drive the status readout. */}
+      {step === 1 && <ConnectScreen onChecked={handleChecked} />}
 
-      {route === 'kitchen-sink' && <KitchenSink />}
-
-      {route === 'wizard' && (
-        <WizardShell step={step} caption={caption}>
-          {step === 1 && <ConnectForm onChecked={handleChecked} />}
+      {step !== 1 && (
+        <WizardShell step={step} status={status}>
           {step === 2 && checkResult && (
             <SelectStep
               result={checkResult}

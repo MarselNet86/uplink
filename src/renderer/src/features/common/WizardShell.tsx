@@ -1,25 +1,25 @@
 import type { ReactNode } from 'react';
 import { Stepper } from '../../ui/Stepper';
+import { TerminalAside } from './TerminalAside';
 
 export interface WizardShellProps {
   step: 1 | 2 | 3 | 4;
-  caption: string;
+  /** Live status readout for the left pane. */
+  status: string;
   children: ReactNode;
 }
 
 /**
- * Split composition from the design code (docs/design-reference.html §06):
- * a static image/caption pane on the left holds the frame across all four
- * wizard steps while the right pane's content is swapped.
+ * Split composition (docs/design-reference.html §06): the terminal pane on
+ * the left holds the frame across all four wizard steps while the right
+ * pane's content is swapped. Both panes are on the terminal treatment - the
+ * app has a single visual style, not one per step.
  */
-export function WizardShell({ step, caption, children }: WizardShellProps) {
+export function WizardShell({ step, status, children }: WizardShellProps) {
   return (
-    <div className="split">
-      <div className="split-aside">
-        <p className="split-caption">{caption}</p>
-      </div>
+    <div className="split term">
+      <TerminalAside status={status} />
       <div className="split-main">
-        <div className="split-brand">Uplink.</div>
         <Stepper current={step} />
         {children}
       </div>
