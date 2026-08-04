@@ -129,12 +129,13 @@ body {
 
 @keyframes uplink-wave {
   from {
-    background-position: 0 0;
+    transform: translateX(0);
   }
   to {
-    /* Exactly one repeating-gradient period (48px) - the loop wraps onto an
-       identical frame instead of jumping. */
-    background-position: -48px 0;
+    /* Positive x = left to right. The distance is exactly one period of the
+       repeating gradient it drives, so the wrap lands on an identical frame
+       instead of jumping back. */
+    transform: translateX(48px);
   }
 }
 
@@ -708,14 +709,32 @@ body {
     inset: 0 auto 0 0;
     height: 1px;
     width: 0;
-    background-color: var(--ink);
-    /* A dim wave sweeping across the fill - the only way to signal "still
-       running" on a bar with no colour channel to spare, since the fill is
-       already at full brightness and can't get any brighter to pulse.
-       `repeating-linear-gradient` plus translating by exactly one period
-       (48px) per loop is what makes it seamless - a single non-repeating
-       band snaps back to its start position every cycle, which read as a
-       stutter rather than continuous motion. */
+    background: var(--ink);
+    /* Clips the wave's overhang so it never darkens the empty track. */
+    overflow: hidden;
+    transition: width var(--dur) var(--ease);
+  }
+  /*
+   * A dim wave travelling left to right across the fill - the only way to
+   * signal "still running" on a bar with no colour channel to spare, since
+   * the fill is already at full brightness and can't get any brighter.
+   *
+   * It lives on a pseudo-element driven by `transform`, not on the fill's
+   * own `background-position`: background-position animation repaints the
+   * gradient on the main thread every frame, which visibly stutters next to
+   * the canvas loop in the left pane, while a transform is composited.
+   * The element overhangs one period on each side so translating it never
+   * exposes an edge, and the travel distance is exactly one period (48px),
+   * which is what makes the loop seamless - any two positions a full period
+   * apart on a repeating gradient render identically.
+   */
+  .progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -48px;
+    right: -48px;
     background-image: repeating-linear-gradient(
       90deg,
       transparent 0px,
@@ -723,12 +742,13 @@ body {
       transparent 48px
     );
     animation: uplink-wave 1s linear infinite;
-    transition: width var(--dur) var(--ease);
   }
   .progress--failed .progress-fill {
-    background-color: var(--oxide);
-    background-image: none;
-    animation: none;
+    background: var(--oxide);
+  }
+  /* A failed bar has to read as stopped, not still working. */
+  .progress--failed .progress-fill::after {
+    content: none;
   }
   .progress--failed .progress-stage {
     color: var(--oxide);
