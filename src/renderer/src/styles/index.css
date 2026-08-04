@@ -129,10 +129,12 @@ body {
 
 @keyframes uplink-wave {
   from {
-    background-position: 150% 0;
+    background-position: 0 0;
   }
   to {
-    background-position: -50% 0;
+    /* Exactly one repeating-gradient period (48px) - the loop wraps onto an
+       identical frame instead of jumping. */
+    background-position: -48px 0;
   }
 }
 
@@ -707,18 +709,20 @@ body {
     height: 1px;
     width: 0;
     background-color: var(--ink);
-    /* A dim band sweeping across the fill - the only way to signal "still
+    /* A dim wave sweeping across the fill - the only way to signal "still
        running" on a bar with no colour channel to spare, since the fill is
-       already at full brightness and can't get any brighter to pulse. */
-    background-image: linear-gradient(
+       already at full brightness and can't get any brighter to pulse.
+       `repeating-linear-gradient` plus translating by exactly one period
+       (48px) per loop is what makes it seamless - a single non-repeating
+       band snaps back to its start position every cycle, which read as a
+       stutter rather than continuous motion. */
+    background-image: repeating-linear-gradient(
       90deg,
-      transparent 0%,
-      rgba(0, 0, 0, 0.55) 50%,
-      transparent 100%
+      transparent 0px,
+      rgba(0, 0, 0, 0.5) 24px,
+      transparent 48px
     );
-    background-size: 200% 100%;
-    background-repeat: no-repeat;
-    animation: uplink-wave 1.8s linear infinite;
+    animation: uplink-wave 1s linear infinite;
     transition: width var(--dur) var(--ease);
   }
   .progress--failed .progress-fill {
