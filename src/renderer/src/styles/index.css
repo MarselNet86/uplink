@@ -121,6 +121,12 @@ body {
   }
 }
 
+@keyframes uplink-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /*
  * Components layer, ported class-for-class from docs/design-reference.html
  * section 05 so every primitive matches the design code exactly rather
@@ -229,9 +235,19 @@ body {
     color: var(--muted);
     cursor: progress;
   }
-  .btn--loading::after {
-    content: ' ··· ]';
-    animation: uplink-pulse 1.2s var(--ease) infinite;
+  /* A hairline ring rather than a filled dot - the spin stays inside the
+     "hairline is the only structural device" rule instead of introducing a
+     solid shape the rest of the design never uses. */
+  .btn-spinner {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-left: 10px;
+    vertical-align: -1px;
+    border: 1.5px solid var(--rule);
+    border-top-color: var(--ink);
+    border-radius: 999px;
+    animation: uplink-spin 0.7s linear infinite;
   }
 
   /* Primary is the same command, promoted by a full-brightness frame and an

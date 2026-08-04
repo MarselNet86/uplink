@@ -23,6 +23,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       {...props}
     >
       {children}
+      {loading && <span className="btn-spinner" aria-hidden="true" />}
     </button>
   ),
 );
