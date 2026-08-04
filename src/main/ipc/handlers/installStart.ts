@@ -55,7 +55,7 @@ export function handleInstallStart(event: IpcMainInvokeEvent, payload: unknown):
   const request = installRequestSchema.parse(payload) as InstallRequest;
   const session = getSession(request.sessionId);
   if (!session) {
-    throwAppError('E_UNKNOWN', 'сессия не найдена, повторите проверку сервера');
+    throwAppError('E_UNKNOWN', 'session not found, please check the server again');
   }
 
   const runId = randomUUID();
@@ -94,7 +94,7 @@ async function runInstall(
   // matching the weight table in tech.md 5.11.
   const preflightStep: Step = {
     id: 'preflight',
-    title: 'Проверка сервера',
+    title: 'Checking server',
     weight: 5,
     critical: true,
     run: async () => {},

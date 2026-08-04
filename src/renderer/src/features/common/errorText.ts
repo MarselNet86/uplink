@@ -6,97 +6,97 @@ export interface ErrorText {
 }
 
 /**
- * Single source of Russian copy per ErrorCode (tech.md section 8/10.2):
+ * Single source of user-facing copy per ErrorCode (tech.md section 8/10.2):
  * main returns codes and terse diagnostics, this table owns the words the
  * user actually sees.
  */
 export const ERROR_TEXT: Record<ErrorCode, ErrorText> = {
   E_NET_UNREACHABLE: {
-    title: 'Сервер недоступен',
-    hint: 'Проверьте IP, порт и то, что сервер включён и принимает соединения.',
+    title: 'Server is unreachable',
+    hint: 'Check the IP, port, and that the server is on and accepting connections.',
   },
   E_SSH_AUTH: {
-    title: 'Не удалось авторизоваться по SSH',
-    hint: 'Проверьте имя пользователя и пароль.',
+    title: 'Failed to authenticate over SSH',
+    hint: 'Check the username and password.',
   },
   E_SSH_HOSTKEY_MISMATCH: {
-    title: 'Отпечаток сервера изменился',
-    hint: 'Это может означать переустановку ОС на сервере или подмену (MITM). Если вы уверены, что это ваш сервер, удалите его из known_hosts.json.',
+    title: 'The server fingerprint has changed',
+    hint: 'This can mean the server OS was reinstalled, or a man-in-the-middle attack. If you are sure this is your server, remove it from known_hosts.json.',
   },
   E_TIMEOUT: {
-    title: 'Превышено время ожидания',
-    hint: 'Сервер отвечает слишком медленно. Попробуйте ещё раз.',
+    title: 'Timed out',
+    hint: 'The server is responding too slowly. Try again.',
   },
   E_NO_SUDO: {
-    title: 'Нет прав администратора',
-    hint: 'Пользователь должен быть root или иметь доступ к sudo без дополнительного подтверждения.',
+    title: 'No administrator privileges',
+    hint: 'The user must be root or have passwordless sudo access.',
   },
   E_DISTRO_UNSUPPORTED: {
-    title: 'Дистрибутив не поддерживается',
-    hint: 'Uplink работает только с Debian и Ubuntu.',
+    title: 'Distribution is not supported',
+    hint: 'Uplink only works with Debian and Ubuntu.',
   },
   E_ARCH_UNSUPPORTED: {
-    title: 'Архитектура не поддерживается',
-    hint: 'Поддерживаются только x86_64 и aarch64.',
+    title: 'Architecture is not supported',
+    hint: 'Only x86_64 and aarch64 are supported.',
   },
   E_NO_SYSTEMD: {
-    title: 'systemd не найден',
-    hint: 'Серверу нужен systemd для управления сервисами.',
+    title: 'systemd not found',
+    hint: 'The server needs systemd to manage services.',
   },
   E_NO_OUTBOUND: {
-    title: 'Нет исходящего доступа в интернет',
-    hint: 'Серверу нужно скачать пакеты. Проверьте исходящий firewall.',
+    title: 'No outbound internet access',
+    hint: 'The server needs to download packages. Check the outbound firewall.',
   },
   E_APT_LOCKED: {
-    title: 'apt занят другим процессом',
-    hint: 'Дождитесь завершения автоматических обновлений и повторите проверку.',
+    title: 'apt is busy with another process',
+    hint: 'Wait for automatic updates to finish, then check again.',
   },
   E_PORT_BUSY: {
-    title: 'Нужный порт занят',
-    hint: 'Освободите порт 443 (или 80 для ACME) от постороннего процесса.',
+    title: 'Required port is in use',
+    hint: 'Free up port 443 (or 80 for ACME) from whatever process is using it.',
   },
   E_DNS_MISMATCH: {
-    title: 'A-запись домена не указывает на сервер',
-    hint: 'Обновите DNS-запись домена и повторите проверку.',
+    title: "Domain's A record does not point to the server",
+    hint: "Update the domain's DNS record and check again.",
   },
   E_ACME_FAILED: {
-    title: 'Не удалось выпустить сертификат',
-    hint: 'Проверьте A-запись, доступность порта 80 и лимиты Let’s Encrypt.',
+    title: 'Failed to issue certificate',
+    hint: 'Check the A record, port 80 availability, and Let’s Encrypt rate limits.',
   },
   E_NO_REALITY_DONOR: {
-    title: 'Не найден донорский домен для Reality',
-    hint: 'Ни один встроенный кандидат не прошёл проверку. Попробуйте позже.',
+    title: 'No donor domain found for Reality',
+    hint: 'None of the built-in candidates passed the check. Try again later.',
   },
   E_CERT_GENERATION_FAILED: {
-    title: 'Не удалось сгенерировать сертификат',
-    hint: 'На сервере не установлен или неисправен openssl.',
+    title: 'Failed to generate certificate',
+    hint: 'openssl is missing or broken on the server.',
   },
   E_DOWNLOAD_FAILED: {
-    title: 'Не удалось скачать пакет',
-    hint: 'Проверьте сеть на сервере и повторите попытку.',
+    title: 'Failed to download package',
+    hint: "Check the server's network connection and try again.",
   },
   E_CONFIG_INVALID: {
-    title: 'Конфигурация не прошла проверку',
-    hint: 'Изменения отменены, сервис не тронут.',
+    title: 'Configuration failed validation',
+    hint: 'Changes were rolled back, the service was not touched.',
   },
   E_SERVICE_FAILED: {
-    title: 'Сервис не запустился',
-    hint: 'Смотрите диагностику для подробностей.',
+    title: 'Service failed to start',
+    hint: 'See the diagnostics for details.',
   },
   E_ALREADY_INSTALLED: {
-    title: 'Протокол уже установлен',
-    hint: 'Используйте управление, чтобы переустановить или удалить.',
+    title: 'Protocol is already installed',
+    hint: 'Use Manage to reinstall or remove it.',
   },
   E_FOREIGN_CONFIG: {
-    title: 'Найден чужой конфиг',
-    hint: 'На сервере уже есть Xray без Reality. Установка невозможна, доступно только удаление.',
+    title: 'Found a foreign config',
+    hint: 'Xray without Reality is already on the server. Installation is not possible, only removal is available.',
   },
   E_CANCELLED: {
-    title: 'Отменено',
-    hint: 'Операция остановлена по вашему запросу.',
+    title: 'Cancelled',
+    hint: 'The operation was stopped at your request.',
   },
   E_UNKNOWN: {
-    title: 'Неизвестная ошибка',
-    hint: 'Повторите попытку. Если ошибка повторяется, посмотрите диагностику.',
+    title: 'Unknown error',
+    hint: 'Try again. If the error keeps happening, check the diagnostics.',
   },
 };

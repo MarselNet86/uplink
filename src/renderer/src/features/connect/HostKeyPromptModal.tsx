@@ -24,15 +24,15 @@ export function HostKeyPromptModal() {
   return (
     <Modal
       open
-      title="Новый сервер"
+      title="New server"
       onClose={() => respond(false)}
       footer={
         <>
           <Button variant="ghost" onClick={() => respond(false)}>
-            Отмена
+            Cancel
           </Button>
           <Button variant="primary" onClick={() => respond(true)}>
-            Доверять
+            Trust
           </Button>
         </>
       }

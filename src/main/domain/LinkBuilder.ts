@@ -19,10 +19,11 @@ export function buildVlessLink(params: VlessLinkParams): string {
     ['encryption', 'none'],
     ['flow', 'xtls-rprx-vision'],
     ['sni', params.sni],
-    // firefox, не chrome: российские мобильные операторы режут TLS-хендшейк
-    // по отпечатку Chrome - TCP встаёт, дальше соединение убивают (в логе
-    // клиента `[EOF] > all retry attempts failed`). Замерено на живом сервере
-    // строгим чередованием запросов: chrome 0/8, firefox 8/8 в те же секунды.
+    // firefox, not chrome: some mobile carriers cut the TLS handshake by
+    // Chrome's fingerprint - the TCP connection comes up, then gets killed
+    // (client log shows `[EOF] > all retry attempts failed`). Measured live
+    // with strictly alternating requests: chrome 0/8, firefox 8/8 in the
+    // same window.
     ['fp', 'firefox'],
     ['pbk', params.publicKey],
     ['sid', params.shortId],

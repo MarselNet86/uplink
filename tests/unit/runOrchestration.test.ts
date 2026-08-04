@@ -189,7 +189,7 @@ describe('buildRunResult', () => {
       {
         protocol: 'hysteria2',
         ok: false,
-        error: { code: 'E_CANCELLED', message: 'Операция отменена пользователем' },
+        error: { code: 'E_CANCELLED', message: 'Operation cancelled by user' },
       },
     ]);
   });
@@ -221,7 +221,7 @@ describe('buildRunResult', () => {
       {
         protocol: 'hysteria2',
         ok: false,
-        error: { code: 'E_CANCELLED', message: 'Пропущено из-за ошибки другого протокола' },
+        error: { code: 'E_CANCELLED', message: 'Skipped because another protocol failed' },
       },
     ]);
     expect(result.diagnostics).toContain('bad config');

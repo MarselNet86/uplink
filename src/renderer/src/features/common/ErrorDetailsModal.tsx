@@ -8,7 +8,7 @@ import { buildErrorReport } from './errorReport';
 export interface ErrorDetailsModalProps {
   open: boolean;
   error: AppError | null;
-  /** What the app was doing when this failed, e.g. "Проверка сервера". */
+  /** What the app was doing when this failed, e.g. "Checking server". */
   context?: string;
   /** Overrides the generated report, for surfaces that failed more than once. */
   report?: string;
@@ -40,7 +40,7 @@ export function ErrorDetailsModal({
         <>
           <CopyButton value={report} />
           <Button variant="primary" onClick={onClose}>
-            Закрыть
+            Close
           </Button>
         </>
       }

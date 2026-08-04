@@ -24,7 +24,7 @@ export async function handleProtocolsRefresh(
   if (!session) {
     const appError: AppError = {
       code: 'E_UNKNOWN',
-      message: 'сессия не найдена, повторите проверку сервера',
+      message: 'session not found, please check the server again',
     };
     throw new Error(encodeAppError(appError));
   }

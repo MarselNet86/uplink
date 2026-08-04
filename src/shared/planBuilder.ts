@@ -5,7 +5,7 @@ export interface ProtocolPick {
   state: ProtocolState;
   /** Checkbox is only enabled when the protocol is not present at all. */
   disabled: boolean;
-  /** "Управление" link/button is shown for anything already found. */
+  /** "Manage" link/button is shown for anything already found. */
   manageable: boolean;
 }
 

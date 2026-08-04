@@ -23,7 +23,7 @@ export const PROTOCOL_ORDER: ProtocolId[] = ['vless-reality', 'hysteria2'];
 
 /**
  * Some StepIds are shared across protocols (`base-packages`: tech.md 5.7
- * H1 "тот же, что X1, шаг общий"). When both protocols contribute a step
+ * H1 "the same as X1, a shared step"). When both protocols contribute a step
  * with the same id, merge them into one StepView that runs both installers'
  * work in sequence, so the step list never shows the same id twice and
  * neither protocol's own needs (e.g. Hysteria2's openssl check) are dropped.
@@ -50,11 +50,11 @@ export function mergeStepsById(steps: Step[]): Step[] {
   return order.map((id) => merged.get(id)).filter((s): s is Step => s !== undefined);
 }
 
-/** Shared pre-removal backup step (tech.md 5.10: "конфиг копируется в /root/uplink-backup-<timestamp>/, отдельный шаг пайплайна"). */
+/** Shared pre-removal backup step (tech.md 5.10: "config is copied to /root/uplink-backup-<timestamp>/, a separate pipeline step"). */
 export function buildBackupStep(runner: ICommandRunner, configPaths: readonly string[]): Step {
   return {
     id: 'backup',
-    title: 'Резервное копирование конфигурации',
+    title: 'Backing up configuration',
     weight: 3,
     critical: true,
     run: async () => {
@@ -117,7 +117,7 @@ export function asRemoverUnit(remover: BaseRemover): TrackableUnit {
  * step is the first destructive action for this protocol, the installer's
  * verify step is when it is genuinely done. No rollback method - once the
  * old install has been removed there is nothing automatic to restore it
- * to, keys are always new (tech.md 5.10: "старые не восстанавливаются").
+ * to, keys are always new (tech.md 5.10: "old ones are never restored").
  */
 export function asReinstallUnit(remover: BaseRemover, installer: BaseInstaller): TrackableUnit {
   return {
@@ -215,7 +215,7 @@ export function buildRunResult(
         : {
             protocol: u.protocolId,
             ok: false,
-            error: { code: 'E_CANCELLED', message: 'Операция отменена пользователем' },
+            error: { code: 'E_CANCELLED', message: 'Operation cancelled by user' },
           },
     );
   } else {
@@ -228,7 +228,7 @@ export function buildRunResult(
       return {
         protocol: u.protocolId,
         ok: false,
-        error: { code: 'E_CANCELLED', message: 'Пропущено из-за ошибки другого протокола' },
+        error: { code: 'E_CANCELLED', message: 'Skipped because another protocol failed' },
       };
     });
   }
@@ -236,7 +236,7 @@ export function buildRunResult(
   const notAvailable: ProtocolOutcome[] = unsupported.map((protocol) => ({
     protocol,
     ok: false,
-    error: { code: 'E_UNKNOWN', message: 'Протокол пока не поддерживается' },
+    error: { code: 'E_UNKNOWN', message: 'Protocol is not supported yet' },
   }));
 
   return {

@@ -91,13 +91,13 @@ export class XrayRealityInstaller extends BaseInstaller {
   // 25, keys 3, config 3, validate 2, start 5, verify 7); StepId values from
   // tech.md section 7.
   protected readonly stepSpecs: InstallerStepSpecs = {
-    prepare: { id: 'base-packages', title: 'Установка базовых пакетов', weight: 5 },
-    installCore: { id: 'xray-install', title: 'Установка ядра Xray', weight: 25 },
-    generateSecrets: { id: 'xray-keys', title: 'Генерация ключей', weight: 3 },
-    writeConfig: { id: 'xray-config', title: 'Запись конфигурации', weight: 3 },
-    validate: { id: 'xray-validate', title: 'Проверка конфигурации', weight: 2 },
-    start: { id: 'xray-start', title: 'Запуск сервиса', weight: 5 },
-    verify: { id: 'xray-verify', title: 'Проверка работы', weight: 7 },
+    prepare: { id: 'base-packages', title: 'Installing base packages', weight: 5 },
+    installCore: { id: 'xray-install', title: 'Installing Xray core', weight: 25 },
+    generateSecrets: { id: 'xray-keys', title: 'Generating keys', weight: 3 },
+    writeConfig: { id: 'xray-config', title: 'Writing configuration', weight: 3 },
+    validate: { id: 'xray-validate', title: 'Validating configuration', weight: 2 },
+    start: { id: 'xray-start', title: 'Starting service', weight: 5 },
+    verify: { id: 'xray-verify', title: 'Verifying operation', weight: 7 },
   };
 
   private uuid = '';
@@ -194,12 +194,12 @@ export class XrayRealityInstaller extends BaseInstaller {
     if (certBytes === null) {
       // openssl missing or unreachable: prefer a possibly-working donor over
       // failing the whole install on a check we could not run.
-      this.warn(`не удалось измерить цепочку сертификатов ${candidate}, проверка пропущена`);
+      this.warn(`could not measure ${candidate}'s certificate chain, check skipped`);
       return true;
     }
     if (certBytes > MAX_DONOR_CERT_BYTES) {
       this.warn(
-        `донор ${candidate} пропущен: цепочка сертификатов ${certBytes} Б превышает лимит ${MAX_DONOR_CERT_BYTES} Б`,
+        `donor ${candidate} skipped: certificate chain of ${certBytes} B exceeds the ${MAX_DONOR_CERT_BYTES} B limit`,
       );
       return false;
     }

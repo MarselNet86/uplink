@@ -147,13 +147,13 @@ async function resolveHostKeyDecision(
 
 function mapConnectError(err: SshErrorLike, hostKeyRejected: boolean): SshConnectError {
   if (hostKeyRejected) {
-    return new SshConnectError('E_SSH_HOSTKEY_MISMATCH', 'Отпечаток сервера изменился');
+    return new SshConnectError('E_SSH_HOSTKEY_MISMATCH', 'The server fingerprint has changed');
   }
   if (err.level === 'client-authentication') {
-    return new SshConnectError('E_SSH_AUTH', 'Не удалось авторизоваться по SSH');
+    return new SshConnectError('E_SSH_AUTH', 'Failed to authenticate over SSH');
   }
   if (err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED' || err.code === 'EHOSTUNREACH') {
-    return new SshConnectError('E_NET_UNREACHABLE', 'Сервер недоступен');
+    return new SshConnectError('E_NET_UNREACHABLE', 'Server is unreachable');
   }
-  return new SshConnectError('E_UNKNOWN', err.message || 'Неизвестная ошибка SSH');
+  return new SshConnectError('E_UNKNOWN', err.message || 'Unknown SSH error');
 }

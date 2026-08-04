@@ -60,7 +60,7 @@ export class Preflight {
     const sudoResult = await this.runner.run('sudo -n true');
     return sudoResult.code === 0
       ? { id: 'privileges', status: 'ok' }
-      : { id: 'privileges', status: 'fail', detail: 'sudo недоступен без пароля' };
+      : { id: 'privileges', status: 'fail', detail: 'sudo is not available without a password' };
   }
 
   private checkDistro(distro: DistroInfo, params: DeployParams): CheckItem {
@@ -68,7 +68,7 @@ export class Preflight {
       return {
         id: 'distro',
         status: 'warn',
-        detail: `выбран ${params.distroHint}, на сервере фактически ${distro.prettyName}`,
+        detail: `${params.distroHint} was selected, but the server is actually ${distro.prettyName}`,
       };
     }
     return { id: 'distro', status: 'ok', detail: distro.prettyName };
@@ -81,7 +81,7 @@ export class Preflight {
   private checkSystemd(distro: DistroInfo): CheckItem {
     return distro.hasSystemd
       ? { id: 'systemd', status: 'ok' }
-      : { id: 'systemd', status: 'fail', detail: 'systemctl не найден' };
+      : { id: 'systemd', status: 'fail', detail: 'systemctl not found' };
   }
 
   private async checkOutbound(): Promise<CheckItem> {
@@ -95,7 +95,7 @@ export class Preflight {
     });
     return wget.code === 0
       ? { id: 'outbound', status: 'ok' }
-      : { id: 'outbound', status: 'fail', detail: 'нет исходящего доступа к интернету' };
+      : { id: 'outbound', status: 'fail', detail: 'no outbound internet access' };
   }
 
   private async checkPorts(params: DeployParams): Promise<CheckItem> {
@@ -115,14 +115,14 @@ export class Preflight {
     if (busy.length === 0) return { id: 'ports', status: 'ok' };
 
     const detail = busy
-      .map((b) => `${b.proto}/${b.port} занят процессом ${b.listener?.process ?? '?'}`)
+      .map((b) => `${b.proto}/${b.port} is busy with process ${b.listener?.process ?? '?'}`)
       .join('; ');
     return { id: 'ports', status: 'fail', detail };
   }
 
   private async checkDns(params: DeployParams, connectedHost: string): Promise<CheckItem> {
     if (!params.domain) {
-      return { id: 'dns', status: 'fail', detail: 'домен не указан' };
+      return { id: 'dns', status: 'fail', detail: 'no domain given' };
     }
     const getent = await this.runner.run(`getent hosts ${shellQuote(params.domain)}`);
     // Compares against the host used to connect; if that host is itself a
@@ -135,7 +135,7 @@ export class Preflight {
     return {
       id: 'dns',
       status: 'fail',
-      detail: `A-запись ${params.domain} не указывает на ${connectedHost}`,
+      detail: `${params.domain}'s A record does not point to ${connectedHost}`,
     };
   }
 
@@ -146,6 +146,6 @@ export class Preflight {
       if (!locked) return { id: 'apt-lock', status: 'ok' };
       if (attempt < 2) await sleep(this.aptLockRetryDelayMs);
     }
-    return { id: 'apt-lock', status: 'fail', detail: 'apt заблокирован другим процессом' };
+    return { id: 'apt-lock', status: 'fail', detail: 'apt is locked by another process' };
   }
 }

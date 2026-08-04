@@ -11,14 +11,14 @@ export const PROTOCOL_PORT: Record<ProtocolId, string> = {
 };
 
 const DEFAULT_META: Record<ProtocolId, string> = {
-  'vless-reality': 'Маскировка под чужой TLS. Домен не нужен.',
-  hysteria2: 'Самоподписанный сертификат. Домен не нужен.',
+  'vless-reality': 'Disguised as a third party’s TLS. No domain needed.',
+  hysteria2: 'Self-signed certificate. No domain needed.',
 };
 
 const STATE_META: Partial<Record<ProtocolState, string>> = {
-  installed: 'Найден на сервере, сервис активен.',
-  broken: 'Найден на сервере, сервис не запущен.',
-  foreign: 'Найден чужой конфиг Xray без Reality.',
+  installed: 'Found on the server, service is active.',
+  broken: 'Found on the server, service is not running.',
+  foreign: 'Found a foreign Xray config without Reality.',
 };
 
 export function protocolMeta(protocol: ProtocolId, state: ProtocolState): string {
@@ -30,7 +30,7 @@ export const PROTOCOL_BADGE: Record<
   { label: string; tone: 'default' | 'success' | 'danger' }
 > = {
   absent: { label: '', tone: 'default' },
-  installed: { label: 'Установлен', tone: 'success' },
-  broken: { label: 'Не запущен', tone: 'default' },
-  foreign: { label: 'Чужой конфиг', tone: 'danger' },
+  installed: { label: 'Installed', tone: 'success' },
+  broken: { label: 'Not running', tone: 'default' },
+  foreign: { label: 'Foreign config', tone: 'danger' },
 };

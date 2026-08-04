@@ -20,8 +20,8 @@ export interface Step {
 }
 
 /**
- * What a Step reports through, per tech.md 10.2 ("Домен зависит от
- * интерфейсов ICommandRunner, IFileTransfer, IProgressSink"). ProgressReporter
+ * What a Step reports through, per tech.md 10.2 ("the domain depends on the
+ * ICommandRunner, IFileTransfer, IProgressSink interfaces"). ProgressReporter
  * is the concrete implementation used in production; Pipeline depends only
  * on this interface so it is testable with a plain recording fake.
  */

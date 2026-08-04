@@ -40,7 +40,7 @@ export function handleProtocolsRemove(event: IpcMainInvokeEvent, payload: unknow
   const request = removeRequestSchema.parse(payload) as RemoveRequest;
   const session = getSession(request.sessionId);
   if (!session) {
-    throwAppError('E_UNKNOWN', 'сессия не найдена, повторите проверку сервера');
+    throwAppError('E_UNKNOWN', 'session not found, please check the server again');
   }
 
   const runId = randomUUID();

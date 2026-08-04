@@ -11,7 +11,7 @@ export class XrayRemover extends BaseRemover {
   protected readonly protocol: ProtocolId = 'vless-reality';
   protected readonly stepSpec: RemoverStepSpec = {
     id: 'xray-remove',
-    title: 'Удаление Xray',
+    title: 'Removing Xray',
     weight: 10,
   };
   protected readonly configPaths = ['/usr/local/etc/xray'];
@@ -19,7 +19,7 @@ export class XrayRemover extends BaseRemover {
   protected async removeCore(): Promise<void> {
     const result = await this.runner.runPrivileged(XRAY_REMOVE_SCRIPT, { timeoutMs: 120_000 });
     if (result.code !== 0) {
-      this.warn('официальный скрипт удаления Xray не сработал, выполнена ручная очистка');
+      this.warn('the official Xray remove script failed, fell back to manual cleanup');
       await this.fallbackRemove();
     }
 

@@ -64,7 +64,7 @@ export default function App() {
         params: deployParams,
       });
     } catch (err) {
-      setFatalError({ error: err as AppError, context: 'Запуск установки' });
+      setFatalError({ error: err as AppError, context: 'Starting installation' });
     }
   };
 
@@ -74,7 +74,7 @@ export default function App() {
     try {
       await window.uplink.protocolsRemove({ sessionId: checkResult.sessionId, protocols });
     } catch (err) {
-      setFatalError({ error: err as AppError, context: 'Удаление протоколов' });
+      setFatalError({ error: err as AppError, context: 'Removing protocols' });
     }
   };
 
@@ -89,7 +89,7 @@ export default function App() {
         params: deployParams,
       });
     } catch (err) {
-      setFatalError({ error: err as AppError, context: 'Переустановка' });
+      setFatalError({ error: err as AppError, context: 'Reinstalling' });
     }
   };
 

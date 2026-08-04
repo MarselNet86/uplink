@@ -40,32 +40,32 @@ export function ConflictModal({ open, found, onClose, onRemove, onReinstall }: C
   return (
     <Modal
       open={open}
-      title="Протокол уже установлен на сервере"
+      title="Protocol is already installed on the server"
       onClose={onClose}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Отмена
+            Cancel
           </Button>
           <Button
             variant="danger"
             disabled={targeted.length === 0}
             onClick={() => onRemove(targeted)}
           >
-            Удалить
+            Remove
           </Button>
           <Button
             variant="primary"
             disabled={targeted.length === 0}
             onClick={() => onReinstall(targeted)}
           >
-            Переустановить
+            Reinstall
           </Button>
         </>
       }
     >
       <p style={{ marginBottom: 'var(--s2)' }}>
-        Переустановка выдаст новые ключи, старые ссылки перестанут работать.
+        Reinstalling issues new keys - old links will stop working.
       </p>
       <div className="stack">
         {found.map((status) => (

@@ -17,7 +17,7 @@ export class Hysteria2Remover extends BaseRemover {
   protected readonly protocol: ProtocolId = 'hysteria2';
   protected readonly stepSpec: RemoverStepSpec = {
     id: 'hy2-remove',
-    title: 'Удаление Hysteria2',
+    title: 'Removing Hysteria2',
     weight: 10,
   };
   protected readonly configPaths = ['/etc/hysteria'];
@@ -25,7 +25,7 @@ export class Hysteria2Remover extends BaseRemover {
   protected async removeCore(): Promise<void> {
     const result = await this.runner.runPrivileged(HY2_REMOVE_SCRIPT, { timeoutMs: 120_000 });
     if (result.code !== 0) {
-      this.warn('официальный скрипт удаления Hysteria2 не сработал, выполнена ручная очистка');
+      this.warn('the official Hysteria2 remove script failed, fell back to manual cleanup');
       await this.fallbackRemove();
     }
 

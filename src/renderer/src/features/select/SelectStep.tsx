@@ -20,8 +20,8 @@ const PROTOCOL_INDEX: Record<ProtocolId, string> = {
 };
 
 const PROTOCOL_DESC: Record<ProtocolId, string> = {
-  'vless-reality': 'Маскировка под чужой TLS. Домен не нужен.',
-  hysteria2: 'Самоподписанный сертификат. Домен не нужен.',
+  'vless-reality': 'Disguised as a third party’s TLS. No domain needed.',
+  hysteria2: 'Self-signed certificate. No domain needed.',
 };
 
 const STATE_GLYPH: Record<ProtocolState, string> = {
@@ -32,23 +32,23 @@ const STATE_GLYPH: Record<ProtocolState, string> = {
 };
 
 const STATE_LABEL: Record<ProtocolState, string> = {
-  installed: 'УСТАНОВЛЕН · АКТИВЕН',
-  broken: 'НЕ ЗАПУЩЕН',
-  absent: 'ОТСУТСТВУЕТ',
-  foreign: 'ЧУЖОЙ КОНФИГ',
+  installed: 'INSTALLED · ACTIVE',
+  broken: 'NOT RUNNING',
+  absent: 'ABSENT',
+  foreign: 'FOREIGN CONFIG',
 };
 
 const CHECK_LABEL: Record<CheckId, string> = {
   tcp: 'TCP',
-  auth: 'АВТОРИЗАЦИЯ',
-  privileges: 'ПРАВА ROOT',
-  distro: 'ДИСТРИБУТИВ',
-  arch: 'АРХИТЕКТУРА',
+  auth: 'AUTH',
+  privileges: 'ROOT PRIVILEGES',
+  distro: 'DISTRO',
+  arch: 'ARCHITECTURE',
   systemd: 'SYSTEMD',
-  outbound: 'ИСХОДЯЩИЙ ДОСТУП',
-  ports: 'ПОРТЫ',
+  outbound: 'OUTBOUND ACCESS',
+  ports: 'PORTS',
   dns: 'DNS',
-  'apt-lock': 'БЛОКИРОВКА APT',
+  'apt-lock': 'APT LOCK',
 };
 
 const CHECK_GLYPH = { ok: '[+]', warn: '[~]', fail: '[!]' } as const;
@@ -73,22 +73,22 @@ export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepPr
 
   return (
     <>
-      <h3 className="split-h">Протоколы</h3>
+      <h3 className="split-h">Protocols</h3>
 
       {/* Same shape as the fields on step 1: label left, value right, one
           hairline per row - the server readout is data, not prose. */}
       <dl className="readout">
         <div className="readout-row">
-          <dt>СИСТЕМА</dt>
+          <dt>SYSTEM</dt>
           <dd>{result.distro.prettyName}</dd>
         </div>
         <div className="readout-row">
-          <dt>АРХИТЕКТУРА</dt>
+          <dt>ARCHITECTURE</dt>
           <dd>{result.distro.arch}</dd>
         </div>
         <div className="readout-row">
           <dt>SYSTEMD</dt>
-          <dd>{result.distro.hasSystemd ? 'ЕСТЬ' : 'НЕТ'}</dd>
+          <dd>{result.distro.hasSystemd ? 'YES' : 'NO'}</dd>
         </div>
       </dl>
 
@@ -132,7 +132,7 @@ export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepPr
 
               {link && (
                 <>
-                  <p className="node-label">КЛЮЧ ДОСТУПА С СЕРВЕРА</p>
+                  <p className="node-label">ACCESS KEY FROM SERVER</p>
                   <p className="node-link">{link}</p>
                 </>
               )}
@@ -141,7 +141,7 @@ export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepPr
                 <div className="node-foot">
                   {link ? <CopyButton value={link} /> : <span />}
                   <Button variant="secondary" onClick={() => onManage(pick.protocol)}>
-                    Управление
+                    Manage
                   </Button>
                 </div>
               ) : (
@@ -150,7 +150,7 @@ export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepPr
                   <Checkbox
                     checked={checked}
                     onCheckedChange={(next) => toggle(pick.protocol, next)}
-                    label={`Установить · ${PROTOCOL_PORT[pick.protocol]}`}
+                    label={`Install · ${PROTOCOL_PORT[pick.protocol]}`}
                   />
                 </>
               )}
@@ -159,7 +159,7 @@ export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepPr
         })}
       </div>
 
-      <Collapsible title={`Проверки сервера · ${okCount}/${result.preflight.items.length}`}>
+      <Collapsible title={`Server checks · ${okCount}/${result.preflight.items.length}`}>
         <dl className="readout">
           {result.preflight.items.map((item) => (
             <div key={item.id} className="readout-row" data-status={item.status}>
@@ -167,7 +167,7 @@ export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepPr
                 <span className="readout-glyph">{CHECK_GLYPH[item.status]}</span>{' '}
                 {CHECK_LABEL[item.id]}
               </dt>
-              <dd>{item.detail ?? (item.status === 'ok' ? 'ОК' : '—')}</dd>
+              <dd>{item.detail ?? (item.status === 'ok' ? 'OK' : '—')}</dd>
             </div>
           ))}
         </dl>
@@ -175,14 +175,14 @@ export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepPr
 
       <div className="split-foot">
         <Button variant="secondary" onClick={onBack}>
-          Назад
+          Back
         </Button>
         <Button
           variant="primary"
           disabled={!plan.canInstall}
           onClick={() => onInstall(plan.installable)}
         >
-          Установить
+          Install
         </Button>
       </div>
     </>

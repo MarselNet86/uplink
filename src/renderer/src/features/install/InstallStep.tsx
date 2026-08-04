@@ -25,14 +25,13 @@ export function InstallStep() {
   const currentStep: StepView | undefined = [...run.steps]
     .reverse()
     .find((step) => step.status === 'running');
-  const stage = currentStep?.title ?? 'Установка';
+  const stage = currentStep?.title ?? 'Installing';
   const failed = run.steps.some((step) => step.status === 'failed');
   const failedStep = run.steps.find((step) => step.status === 'failed');
   // While the run is still going `result` is null, so name the failed step -
   // that is more than the placeholder alone told the user.
   const diagnostics =
-    run.result?.diagnostics ??
-    (failedStep ? `Шаг «${failedStep.title}» завершился с ошибкой.` : null);
+    run.result?.diagnostics ?? (failedStep ? `Step "${failedStep.title}" failed.` : null);
 
   const handleCancel = () => {
     setCancelling(true);
@@ -42,9 +41,9 @@ export function InstallStep() {
   return (
     <>
       <div>
-        <h3 className="split-h">Установка</h3>
+        <h3 className="split-h">Installing</h3>
         <p className="field-hint" style={{ marginTop: 6 }}>
-          Не закрывайте приложение до завершения.
+          Do not close the app until this finishes.
         </p>
       </div>
 
@@ -54,9 +53,9 @@ export function InstallStep() {
       {run.note && <Alert tone="info" title={run.note} />}
 
       {failed && (
-        <Collapsible title="Диагностика">
+        <Collapsible title="Diagnostics">
           <pre className="mono" style={{ whiteSpace: 'pre-wrap' }}>
-            {diagnostics ?? 'Подробности появятся после завершения шага.'}
+            {diagnostics ?? 'Details will appear once the step finishes.'}
           </pre>
           {diagnostics && <CopyButton value={diagnostics} className="mt-2" />}
         </Collapsible>
@@ -66,10 +65,10 @@ export function InstallStep() {
           control grow to a paragraph and stop looking like a button. */}
       <div className="split-foot">
         <span className="eyebrow">
-          {cancelling ? 'Прерывание может оставить сервер в промежуточном состоянии' : ''}
+          {cancelling ? 'Cancelling may leave the server in an intermediate state' : ''}
         </span>
         <Button variant="secondary" onClick={handleCancel} disabled={cancelling}>
-          {cancelling ? 'Прерываю' : 'Отмена'}
+          {cancelling ? 'Cancelling' : 'Cancel'}
         </Button>
       </div>
     </>

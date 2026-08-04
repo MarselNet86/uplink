@@ -35,7 +35,7 @@ function checkTcp(host: string, port: number): Promise<CheckItem> {
     };
     socket.once('connect', () => finish({ id: 'tcp', status: 'ok' }));
     socket.once('timeout', () =>
-      finish({ id: 'tcp', status: 'fail', detail: 'таймаут подключения' }),
+      finish({ id: 'tcp', status: 'fail', detail: 'connection timed out' }),
     );
     socket.once('error', (err) => finish({ id: 'tcp', status: 'fail', detail: err.message }));
   });
@@ -52,7 +52,7 @@ export async function handleSshCheck(
 
   const tcpItem = await checkTcp(credentials.host, credentials.port);
   if (tcpItem.status !== 'ok') {
-    throwAppError('E_NET_UNREACHABLE', 'Сервер недоступен по TCP', tcpItem.detail);
+    throwAppError('E_NET_UNREACHABLE', 'Server is unreachable over TCP', tcpItem.detail);
   }
 
   const win = BrowserWindow.fromWebContents(event.sender);

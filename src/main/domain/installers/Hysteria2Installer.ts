@@ -14,7 +14,7 @@ const HY2_SERVICE = 'hysteria-server.service';
 // Trusted, unrelated-to-the-app domain the server pretends to be when it
 // gets a request that isn't the VPN protocol itself (tech.md 5.7): reuses
 // the same host as the self-signed cert's CN, nothing user-controlled ever
-// reaches this URL (tech.md 5.7's "не из пользовательского ввода").
+// reaches this URL (tech.md 5.7's "not from user input").
 const MASQUERADE_URL = 'https://www.bing.com/';
 const INSTALL_RETRY_DELAYS_MS = [5_000, 15_000, 30_000];
 const INSTALL_TIMEOUT_MS = 600_000;
@@ -102,19 +102,21 @@ export class Hysteria2Installer extends BaseInstaller {
   ) {
     super(runner, fileTransfer, host);
     this.stepSpecs = {
-      prepare: { id: 'base-packages', title: 'Установка базовых пакетов', weight: 5 },
-      installCore: { id: 'hy2-install', title: 'Установка ядра Hysteria2', weight: 20 },
-      generateSecrets: { id: 'hy2-secret', title: 'Генерация пароля', weight: 2 },
-      writeConfig: { id: 'hy2-config', title: 'Запись конфигурации', weight: 3 },
+      prepare: { id: 'base-packages', title: 'Installing base packages', weight: 5 },
+      installCore: { id: 'hy2-install', title: 'Installing Hysteria2 core', weight: 20 },
+      generateSecrets: { id: 'hy2-secret', title: 'Generating password', weight: 2 },
+      writeConfig: { id: 'hy2-config', title: 'Writing configuration', weight: 3 },
       validate:
         params.tlsMode === 'self-signed'
-          ? { id: 'hy2-cert-generate', title: 'Генерация сертификата', weight: 3 }
+          ? { id: 'hy2-cert-generate', title: 'Generating certificate', weight: 3 }
           : null,
-      start: { id: 'hy2-start', title: 'Запуск сервиса', weight: 5 },
+      start: { id: 'hy2-start', title: 'Starting service', weight: 5 },
       verify: {
         id: 'hy2-verify',
         title:
-          params.tlsMode === 'acme-domain' ? 'Проверка и выпуск сертификата' : 'Проверка работы',
+          params.tlsMode === 'acme-domain'
+            ? 'Verifying and issuing certificate'
+            : 'Verifying operation',
         weight: params.tlsMode === 'acme-domain' ? 15 : 7,
       },
     };

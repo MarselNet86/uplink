@@ -20,7 +20,7 @@ export function CopyButton({ value, className }: CopyButtonProps) {
 
   return (
     <button type="button" onClick={() => void handleClick()} className={cn('btn', className)}>
-      {copied ? 'Скопировано' : 'Копировать'}
+      {copied ? 'Copied' : 'Copy'}
     </button>
   );
 }

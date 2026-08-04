@@ -14,11 +14,11 @@ import { ERROR_TEXT } from './errorText';
 export function buildErrorReport(error: AppError, context?: string): string {
   const lines = [
     `Uplink · ${new Date().toISOString()}`,
-    context ? `Контекст: ${context}` : null,
-    `Код: ${error.code}`,
-    `Заголовок: ${ERROR_TEXT[error.code].title}`,
-    `Детали: ${error.message}`,
-    error.hint ? `Дополнительно: ${error.hint}` : null,
+    context ? `Context: ${context}` : null,
+    `Code: ${error.code}`,
+    `Title: ${ERROR_TEXT[error.code].title}`,
+    `Details: ${error.message}`,
+    error.hint ? `Hint: ${error.hint}` : null,
   ];
   return lines.filter((line): line is string => line !== null).join('\n');
 }

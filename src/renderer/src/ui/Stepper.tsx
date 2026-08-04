@@ -3,12 +3,7 @@ export interface StepperProps {
   labels?: [string, string, string, string];
 }
 
-const defaultLabels: [string, string, string, string] = [
-  'Сервер',
-  'Протоколы',
-  'Установка',
-  'Ключи',
-];
+const defaultLabels: [string, string, string, string] = ['Server', 'Protocols', 'Install', 'Keys'];
 
 export function Stepper({ current, labels = defaultLabels }: StepperProps) {
   return (

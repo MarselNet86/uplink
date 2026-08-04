@@ -3,9 +3,9 @@ import type { ProgressEvent, StepId } from '@shared/types';
 import { ProgressReporter } from '../../src/main/pipeline/ProgressReporter';
 
 const STEPS = [
-  { id: 'base-packages' as StepId, title: 'Базовые пакеты', weight: 5 },
-  { id: 'xray-install' as StepId, title: 'Установка ядра', weight: 25 },
-  { id: 'xray-verify' as StepId, title: 'Проверка', weight: 70 },
+  { id: 'base-packages' as StepId, title: 'Base packages', weight: 5 },
+  { id: 'xray-install' as StepId, title: 'Installing core', weight: 25 },
+  { id: 'xray-verify' as StepId, title: 'Verifying', weight: 70 },
 ];
 
 function makeReporter(events: ProgressEvent[]) {

@@ -84,11 +84,11 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
 
   return (
     <>
-      <h3 className="split-h">Данные сервера</h3>
+      <h3 className="split-h">Server details</h3>
 
       <div className="field-row">
         <Input
-          label="IP или хост"
+          label="IP or host"
           mono
           value={values.host}
           onChange={(e) => set('host', e.target.value)}
@@ -96,7 +96,7 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
           className="flex-[2]"
         />
         <Input
-          label="Порт"
+          label="Port"
           mono
           value={values.port}
           onChange={(e) => set('port', e.target.value)}
@@ -107,28 +107,28 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
 
       <div className="field-row">
         <Input
-          label="Пользователь"
+          label="Username"
           value={values.username}
           onChange={(e) => set('username', e.target.value)}
           error={errors.username}
         />
         <PasswordInput
-          label="Пароль"
+          label="Password"
           value={values.password}
           onChange={(e) => set('password', e.target.value)}
           error={errors.password}
         />
       </div>
 
-      <Collapsible title="Домен для Hysteria2 · автоматически">
+      <Collapsible title="Domain for Hysteria2 · automatic">
         <p className="field-hint" style={{ marginBottom: 'var(--s2)' }}>
           {autoDomain ? (
             <>
-              Бесплатно и без регистрации будет использован домен <code>{autoDomain}</code> и
-              доверенный сертификат Let&apos;s Encrypt.
+              The domain <code>{autoDomain}</code> and a trusted Let&apos;s Encrypt certificate will
+              be used, free and with no registration.
             </>
           ) : (
-            'Автоматический домен недоступен для этого хоста (не похож на IPv4 или домен) - будет использован самоподписанный сертификат.'
+            'An automatic domain is not available for this host (it does not look like an IPv4 address or a domain) - a self-signed certificate will be used instead.'
           )}
         </p>
         <Checkbox
@@ -142,13 +142,13 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
               }
             }
           }}
-          label="Указать свой домен"
-          description="Только если у вас уже есть собственный домен, направленный на этот сервер"
+          label="Use my own domain"
+          description="Only if you already have your own domain pointed at this server"
         />
         {values.domainOverride && (
           <>
             <Input
-              label="Домен"
+              label="Domain"
               mono
               placeholder="vpn.example.com"
               value={values.domain}
@@ -156,7 +156,7 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
               error={errors.domain}
             />
             <Input
-              label="Email для ACME"
+              label="Email for ACME"
               placeholder="you@example.com"
               value={values.acmeEmail}
               onChange={(e) => set('acmeEmail', e.target.value)}
@@ -166,41 +166,41 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
         )}
       </Collapsible>
 
-      <Collapsible title="Маскировка SNI · необязательно">
+      <Collapsible title="SNI masking · optional">
         <p className="field-hint" style={{ marginBottom: 'var(--s2)' }}>
-          Оставьте пустым, чтобы приложение выбрало значения само.
+          Leave blank to let the app choose the values automatically.
         </p>
         <Input
-          label="Донор для Reality"
+          label="Donor for Reality"
           mono
           placeholder="www.cloudflare.com"
           value={values.realitySni}
           onChange={(e) => set('realitySni', e.target.value)}
           error={errors.realitySni}
-          hint="Чужой сайт с TLS 1.3 и короткой цепочкой сертификатов. Проверяется перед установкой."
+          hint="A third-party site with TLS 1.3 and a short certificate chain. Checked before installation."
         />
         <Input
-          label="SNI для Hysteria2"
+          label="SNI for Hysteria2"
           mono
           placeholder="bing.com"
           value={values.hysteriaSni}
           onChange={(e) => set('hysteriaSni', e.target.value)}
           error={errors.hysteriaSni}
-          hint="Только имя в самоподписанном сертификате, никуда не резолвится."
+          hint="Only a name in the self-signed certificate, does not resolve anywhere."
         />
       </Collapsible>
 
       <ErrorDetailsModal
         open={serverError !== null}
         error={serverError}
-        context="Проверка сервера"
+        context="Checking server"
         onClose={() => setServerError(null)}
       />
 
       <div className="split-foot">
-        <span className="eyebrow">Пароль не сохраняется на диск</span>
+        <span className="eyebrow">Password is not saved to disk</span>
         <Button variant="primary" loading={loading} onClick={() => void submit()}>
-          Проверить сервер
+          Check server
         </Button>
       </div>
     </>

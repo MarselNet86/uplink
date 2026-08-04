@@ -31,9 +31,9 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
             tabIndex={-1}
             onClick={() => setVisible((v) => !v)}
             className="eyebrow absolute right-0 cursor-pointer bg-transparent"
-            aria-label={visible ? 'Скрыть пароль' : 'Показать пароль'}
+            aria-label={visible ? 'Hide password' : 'Show password'}
           >
-            {visible ? 'скрыть' : 'показать'}
+            {visible ? 'hide' : 'show'}
           </button>
         </span>
         {error ? (

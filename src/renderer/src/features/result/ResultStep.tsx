@@ -31,10 +31,10 @@ function buildDiagnosticsReport(result: RunResult): string {
     );
   }
   if (result.warnings.length > 0) {
-    lines.push('', 'Предупреждения:', ...result.warnings.map((w) => `- ${w}`));
+    lines.push('', 'Warnings:', ...result.warnings.map((w) => `- ${w}`));
   }
   if (result.diagnostics) {
-    lines.push('', 'Диагностика:', result.diagnostics);
+    lines.push('', 'Diagnostics:', result.diagnostics);
   }
   return lines.join('\n');
 }
@@ -47,18 +47,18 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
   const failed = result.outcomes.filter((o) => !o.ok);
   const diagnosticsReport = buildDiagnosticsReport(result);
   // Pops on arrival at this step whenever anything failed, then stays closed
-  // once dismissed - the report is still reachable under "Диагностика".
+  // once dismissed - the report is still reachable under "Diagnostics".
   const [errorDismissed, setErrorDismissed] = useState(false);
   const firstError = failed.find((o) => o.error)?.error ?? null;
 
   return (
     <>
       <div>
-        <h3 className="split-h">Готово</h3>
+        <h3 className="split-h">Done</h3>
         <p className="field-hint" style={{ marginTop: 6 }}>
           {succeeded.length > 0
-            ? 'Ссылки показываются один раз, приложение их не хранит.'
-            : 'Результат операции ниже.'}
+            ? 'Links are shown once, the app does not store them.'
+            : 'The result of the operation is below.'}
         </p>
       </div>
 
@@ -74,7 +74,7 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
       )}
 
       {succeededWithoutLink.length > 0 && (
-        <Alert tone="info" title="Удалено">
+        <Alert tone="info" title="Removed">
           {succeededWithoutLink.map((o) => PROTOCOL_TITLE[o.protocol]).join(', ')}
         </Alert>
       )}
@@ -84,13 +84,14 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
         <Alert
           key={outcome.protocol}
           tone="error"
-          title={`${PROTOCOL_TITLE[outcome.protocol]}: ${outcome.error ? ERROR_TEXT[outcome.error.code].title : 'Ошибка'}`}
+          title={`${PROTOCOL_TITLE[outcome.protocol]}: ${outcome.error ? ERROR_TEXT[outcome.error.code].title : 'Error'}`}
         />
       ))}
 
       {succeeded.length > 0 && (
-        <Alert tone="info" title="Финальный шаг">
-          Добавьте ссылки выше как подписку в прокси-клиент INCY. Скачать клиент для всех платформ:{' '}
+        <Alert tone="info" title="Final step">
+          Add the links above as a subscription in the INCY proxy client. Download the client for
+          all platforms:{' '}
           <a href={INCY_DOWNLOAD_URL} target="_blank" rel="noreferrer">
             {INCY_DOWNLOAD_URL}
           </a>
@@ -98,9 +99,9 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
       )}
 
       {(failed.length > 0 || result.diagnostics) && (
-        <Collapsible title="Диагностика">
+        <Collapsible title="Diagnostics">
           <p className="field-hint" style={{ marginBottom: 'var(--s2)' }}>
-            Скопируйте и пришлите этот текст, если нужна помощь с ошибкой.
+            Copy and send this text if you need help with the error.
           </p>
           <pre className="mono" style={{ whiteSpace: 'pre-wrap' }}>
             {diagnosticsReport}
@@ -112,7 +113,7 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
       <div className="split-foot">
         <span />
         <Button variant="primary" onClick={onDone}>
-          Готово
+          Done
         </Button>
       </div>
 

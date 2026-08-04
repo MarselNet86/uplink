@@ -25,7 +25,7 @@ const IPV4_RE = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|
 
 /**
  * Free, registration-less ACME domain for Hysteria2, derived from whatever
- * the user already typed in "IP или хост" - no separate purchase or signup
+ * the user already typed in "IP or host" - no separate purchase or signup
  * needed for the default path. Two cases actually resolve to the server:
  *
  * - an IPv4 host gets the sslip.io wildcard suffix (`1.2.3.4.sslip.io`
@@ -53,37 +53,37 @@ export function validateConnectForm(values: ConnectFormValues): ConnectFormError
   const errors: ConnectFormErrors = {};
 
   if (!values.host.trim() || !HOST_RE.test(values.host.trim())) {
-    errors.host = 'Введите IPv4, IPv6 или домен';
+    errors.host = 'Enter an IPv4, IPv6, or domain';
   }
 
   const port = Number(values.port);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    errors.port = 'Порт вне диапазона 1—65535';
+    errors.port = 'Port must be between 1 and 65535';
   }
 
   if (!values.username.trim() || /\s/.test(values.username)) {
-    errors.username = 'Введите имя пользователя без пробелов';
+    errors.username = 'Enter a username with no spaces';
   }
 
   if (!values.password) {
-    errors.password = 'Введите пароль';
+    errors.password = 'Enter a password';
   }
 
   if (values.domainOverride) {
     if (!FQDN_RE.test(values.domain.trim())) {
-      errors.domain = 'Введите домен, например vpn.example.com';
+      errors.domain = 'Enter a domain, e.g. vpn.example.com';
     }
     if (!EMAIL_RE.test(values.acmeEmail.trim())) {
-      errors.acmeEmail = 'Введите почту в формате you@example.com';
+      errors.acmeEmail = 'Enter an email like you@example.com';
     }
   }
 
   // Both SNI fields are optional; only validate what was actually typed.
   if (values.realitySni.trim() && !FQDN_RE.test(values.realitySni.trim())) {
-    errors.realitySni = 'Введите домен, например www.cloudflare.com';
+    errors.realitySni = 'Enter a domain, e.g. www.cloudflare.com';
   }
   if (values.hysteriaSni.trim() && !FQDN_RE.test(values.hysteriaSni.trim())) {
-    errors.hysteriaSni = 'Введите домен, например bing.com';
+    errors.hysteriaSni = 'Enter a domain, e.g. bing.com';
   }
 
   return errors;

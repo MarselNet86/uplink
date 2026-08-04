@@ -95,8 +95,8 @@ export abstract class BaseInstaller {
   /**
    * Wraps the same fixed eight phases install() calls as Step objects, so a
    * top-level orchestrator can concatenate several installers' steps into
-   * one Pipeline run and get one shared progress bar (tech.md 5.11: "общий
-   * прогресс-бар"). The phase order itself stays fixed here, never in the
+   * one Pipeline run and get one shared progress bar (tech.md 5.11: "one
+   * shared progress bar"). The phase order itself stays fixed here, never in the
    * subclass - only the id/title/weight per phase is subclass-supplied.
    */
   buildSteps(): Step[] {
@@ -198,7 +198,7 @@ export abstract class BaseInstaller {
 
   /**
    * `apt-get update` + `install` for a fixed package list (tech.md 10.2:
-   * "apt-get install вызывается из одного места") - both installers call
+   * "apt-get install is called from a single place") - both installers call
    * this instead of hand-rolling the same two-line invocation.
    */
   protected async installAptPackages(packages: string[]): Promise<void> {
@@ -210,7 +210,7 @@ export abstract class BaseInstaller {
 
   /**
    * Runs a privileged command with retries and backoff (tech.md 5.6 X2:
-   * "3 попытки с бэкоффом 5/15/30 с"). Returns the last result even on
+   * "3 attempts with 5/15/30s backoff"). Returns the last result even on
    * exhaustion so the caller can inspect stderr before throwing.
    */
   protected async runWithRetry(command: string, delaysMs: number[], timeoutMs?: number) {
@@ -277,14 +277,12 @@ export abstract class BaseInstaller {
   protected async allowFirewallPort(port: number, proto: 'tcp' | 'udp'): Promise<void> {
     const ufw = await this.runner.run('command -v ufw');
     if (ufw.code !== 0) {
-      this.warn(
-        `ufw не найден, откройте ${port}/${proto} вручную при использовании другого firewall`,
-      );
+      this.warn(`ufw not found, open ${port}/${proto} manually if you use another firewall`);
       return;
     }
     const status = await this.runner.run('ufw status');
     if (!/Status:\s*active/i.test(status.stdout)) {
-      this.warn(`ufw установлен, но не активен - правило для ${port}/${proto} не добавлено`);
+      this.warn(`ufw is installed but not active - rule for ${port}/${proto} was not added`);
       return;
     }
     await this.runner.runPrivileged(`ufw allow ${port}/${proto}`);

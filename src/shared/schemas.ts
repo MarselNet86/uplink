@@ -24,7 +24,7 @@ const hostnameSchema = z
   .min(1)
   .max(253)
   .regex(/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/, {
-    message: 'должно быть доменным именем, например www.cloudflare.com',
+    message: 'must be a hostname, e.g. www.cloudflare.com',
   });
 
 export const deployParamsSchema = z
