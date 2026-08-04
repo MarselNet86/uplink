@@ -15,7 +15,6 @@ export interface ResultStepProps {
 }
 
 const INCY_DOWNLOAD_URL = 'https://github.com/INCY-DEV/incy-platforms';
-const SUBSCRIBE_URL = 'https://t.me/DaimonGRP';
 
 /**
  * Plain-text dump of everything useful for debugging: per-protocol error
@@ -113,7 +112,7 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
       <div className="split-foot">
         <span />
         <Button variant="primary" onClick={onDone}>
-          {`йоу спасибо, что используешь наше приложение. Подпишись: ${SUBSCRIBE_URL}`}
+          Готово
         </Button>
       </div>
 
