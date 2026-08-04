@@ -127,6 +127,15 @@ body {
   }
 }
 
+@keyframes uplink-wave {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
 /*
  * Components layer, ported class-for-class from docs/design-reference.html
  * section 05 so every primitive matches the design code exactly rather
@@ -696,12 +705,26 @@ body {
     position: absolute;
     inset: 0 auto 0 0;
     height: 1px;
-    background: var(--ink);
     width: 0;
+    background-color: var(--ink);
+    /* A dim band sweeping across the fill - the only way to signal "still
+       running" on a bar with no colour channel to spare, since the fill is
+       already at full brightness and can't get any brighter to pulse. */
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(0, 0, 0, 0.55) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    animation: uplink-wave 1.8s linear infinite;
     transition: width var(--dur) var(--ease);
   }
   .progress--failed .progress-fill {
-    background: var(--oxide);
+    background-color: var(--oxide);
+    background-image: none;
+    animation: none;
   }
   .progress--failed .progress-stage {
     color: var(--oxide);
