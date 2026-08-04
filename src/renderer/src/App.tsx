@@ -3,7 +3,7 @@ import type { AppError, CheckResult, DeployParams, ProtocolId } from '@shared/ty
 import { useAppStore } from './store/useAppStore';
 import { ErrorDetailsModal } from './features/common/ErrorDetailsModal';
 import { WizardShell } from './features/common/WizardShell';
-import { ConnectScreen } from './features/connect/ConnectScreen';
+import { ConnectForm } from './features/connect/ConnectForm';
 import { HostKeyPromptModal } from './features/connect/HostKeyPromptModal';
 import { InstallStep } from './features/install/InstallStep';
 import { ConflictModal } from './features/manage/ConflictModal';
@@ -117,24 +117,24 @@ export default function App() {
 
   return (
     <>
-      {step === 1 && <ConnectScreen onChecked={handleChecked} />}
-
-      {step !== 1 && (
-        <WizardShell step={step}>
-          {step === 2 && checkResult && (
-            <SelectStep
-              result={checkResult}
-              onBack={() => setCheckResult(null)}
-              onManage={() => setManageOpen(true)}
-              onInstall={(protocols) => void handleInstall(protocols)}
-            />
-          )}
-          {step === 3 && <InstallStep />}
-          {step === 4 && run?.result && (
-            <ResultStep result={run.result} onDone={() => void handleDone()} />
-          )}
-        </WizardShell>
-      )}
+      {/* One persistent shell for every step - mounting a separate one for
+          step 1 restarted the terminal canvas's growth animation on every
+          transition into or out of it. */}
+      <WizardShell step={step}>
+        {step === 1 && <ConnectForm onChecked={handleChecked} />}
+        {step === 2 && checkResult && (
+          <SelectStep
+            result={checkResult}
+            onBack={() => setCheckResult(null)}
+            onManage={() => setManageOpen(true)}
+            onInstall={(protocols) => void handleInstall(protocols)}
+          />
+        )}
+        {step === 3 && <InstallStep />}
+        {step === 4 && run?.result && (
+          <ResultStep result={run.result} onDone={() => void handleDone()} />
+        )}
+      </WizardShell>
 
       {checkResult && (
         <ConflictModal
