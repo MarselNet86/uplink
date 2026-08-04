@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, shell } from 'electron';
+import { app, BrowserWindow, nativeTheme, session, shell } from 'electron';
 import { join } from 'node:path';
 import { is } from '@electron-toolkit/utils';
 import { registerIpcHandlers } from './ipc/registry';
@@ -12,7 +12,10 @@ function createWindow(): BrowserWindow {
     height: 680,
     resizable: false,
     autoHideMenuBar: true,
-    backgroundColor: '#EFEFEE',
+    // Matches --well from the renderer's dark palette - the OS chrome (title
+    // bar, this background shown before the page paints) otherwise defaults
+    // to a light system theme that flashes against the app's black content.
+    backgroundColor: '#0a0a0a',
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -50,6 +53,12 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+  // The app has no light variant, so its title bar shouldn't have one either -
+  // without this the OS chrome defaults to whatever the system theme is,
+  // which is a light grey title bar sitting on top of a black window on most
+  // machines. Set before createWindow() so the bar is never briefly light.
+  nativeTheme.themeSource = 'dark';
+
   // Deny permission requests (camera, mic, geolocation, etc.) - the app needs none.
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => {
     callback(false);
