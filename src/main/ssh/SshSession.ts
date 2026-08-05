@@ -40,6 +40,7 @@ export class SshSession {
   private readonly fileTransfer: FileTransfer;
   private idleTimer: NodeJS.Timeout | undefined;
   private disposed = false;
+  private idleTimeoutHandler: (() => void) | undefined;
 
   private readonly host: string;
 
@@ -47,8 +48,18 @@ export class SshSession {
     private readonly client: Client,
     credentials: ServerCredentials,
   ) {
-    this.commandRunner = new CommandRunner(client, credentials.username, credentials.password);
-    this.fileTransfer = new FileTransfer(client);
+    // Both actually touch the wire per call, so either one counts as
+    // activity and rearms the idle timer - a long-running single command
+    // (e.g. an apt-get download) no longer races a timer that was only ever
+    // armed once, at session creation (BUG-01).
+    const onActivity = (): void => this.armIdleTimer();
+    this.commandRunner = new CommandRunner(
+      client,
+      credentials.username,
+      credentials.password,
+      onActivity,
+    );
+    this.fileTransfer = new FileTransfer(client, onActivity);
     this.host = credentials.host;
     this.armIdleTimer();
   }
@@ -115,6 +126,11 @@ export class SshSession {
     return this.host;
   }
 
+  /** Registered by sessionRegistry so a timer-triggered dispose also drops the now-dead session from its Map (tech.md 5.1; BUG-01's E-06 sub-case: without this, `getSession()` kept returning a disposed session). */
+  onIdleTimeout(handler: () => void): void {
+    this.idleTimeoutHandler = handler;
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -124,7 +140,10 @@ export class SshSession {
 
   private armIdleTimer(): void {
     if (this.idleTimer) clearTimeout(this.idleTimer);
-    this.idleTimer = setTimeout(() => this.dispose(), IDLE_TIMEOUT_MS);
+    this.idleTimer = setTimeout(() => {
+      this.dispose();
+      this.idleTimeoutHandler?.();
+    }, IDLE_TIMEOUT_MS);
   }
 }
 

@@ -30,6 +30,8 @@ export class CommandRunner implements ICommandRunner {
     private readonly client: Client,
     private readonly username: string,
     private readonly password: string,
+    /** Called once per command actually sent over the wire (tech.md 5.1's idle timer keys off this, not off getCommandRunner()). */
+    private readonly onActivity?: () => void,
   ) {}
 
   async run(
@@ -72,11 +74,21 @@ export class CommandRunner implements ICommandRunner {
     command: string,
     opts?: { timeoutMs?: number; stdin?: string },
   ): Promise<CommandResult> {
+    this.onActivity?.();
     const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutSec = Math.max(1, Math.ceil(timeoutMs / 1000));
     const startedAt = Date.now();
 
+    // Wrapped in the remote `timeout` so a hung command is actually killed
+    // on the server, not just detached from (BUG-18: `stream.close()` alone
+    // only closes the client's view of the channel - the remote process,
+    // e.g. an in-progress apt-get/curl, kept running to completion on its
+    // own). `-k 10` sends SIGKILL 10s after the initial SIGTERM for
+    // processes that ignore it.
+    const wrapped = `timeout -k 10 ${timeoutSec}s sh -c ${shellQuote(command)}`;
+
     return new Promise((resolve, reject) => {
-      this.client.exec(command, (err, stream: ClientChannel) => {
+      this.client.exec(wrapped, (err, stream: ClientChannel) => {
         if (err) {
           reject(err);
           return;
@@ -86,12 +98,17 @@ export class CommandRunner implements ICommandRunner {
         let stderr = '';
         let settled = false;
 
-        const timer = setTimeout(() => {
-          if (settled) return;
-          settled = true;
-          stream.close();
-          reject(new CommandRunnerError('E_TIMEOUT', `command timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
+        // Backstop beyond the server-side `timeout` (+ its kill-after grace)
+        // in case the channel itself never reports back at all.
+        const timer = setTimeout(
+          () => {
+            if (settled) return;
+            settled = true;
+            stream.close();
+            reject(new CommandRunnerError('E_TIMEOUT', `command timed out after ${timeoutMs}ms`));
+          },
+          timeoutMs + 15_000,
+        );
 
         stream.on('data', (chunk: Buffer) => {
           stdout = appendCapped(stdout, chunk.toString('utf8'), MAX_OUTPUT_BYTES);
@@ -104,6 +121,14 @@ export class CommandRunner implements ICommandRunner {
           if (settled) return;
           settled = true;
           clearTimeout(timer);
+          // 124 is `timeout`'s own "command was killed" exit code - report
+          // it the same way the pre-existing client-side timeout was
+          // reported, so callers keep seeing one consistent E_TIMEOUT
+          // rejection regardless of which side actually enforced it.
+          if (code === 124) {
+            reject(new CommandRunnerError('E_TIMEOUT', `command timed out after ${timeoutMs}ms`));
+            return;
+          }
           resolve({ code: code ?? -1, stdout, stderr, durationMs: Date.now() - startedAt });
         });
 

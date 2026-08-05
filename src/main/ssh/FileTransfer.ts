@@ -3,9 +3,13 @@ import type { IFileTransfer } from './types';
 
 /** Writes files over SFTP with an explicit mode (tech.md 5.2/5.3). */
 export class FileTransfer implements IFileTransfer {
-  constructor(private readonly client: Client) {}
+  constructor(
+    private readonly client: Client,
+    private readonly onActivity?: () => void,
+  ) {}
 
   writeFile(remotePath: string, content: string, mode: number): Promise<void> {
+    this.onActivity?.();
     return new Promise((resolve, reject) => {
       this.client.sftp((err, sftp) => {
         if (err) {
