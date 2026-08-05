@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import type { CheckItem, DeployParams, DistroInfo } from '@shared/types';
 import type { ICommandRunner } from '../ssh/types';
 import { shellQuote } from '../security/shellQuote';
@@ -124,12 +125,14 @@ export class Preflight {
     if (!params.domain) {
       return { id: 'dns', status: 'fail', detail: 'no domain given' };
     }
-    const getent = await this.runner.run(`getent hosts ${shellQuote(params.domain)}`);
-    // Compares against the host used to connect; if that host is itself a
-    // hostname rather than an IP this is a rough approximation, refined
-    // when the acme-domain branch is fully built out in stage 6.
-    const resolvedIp = getent.stdout.trim().split(/\s+/)[0];
-    if (resolvedIp && resolvedIp === connectedHost) {
+    const domainIp = await this.resolveHost(params.domain);
+    // BUG-09: comparing against `connectedHost` only worked when the user
+    // connected by IP. When they connected by hostname (e.g. a sslip.io
+    // name), the old code compared that hostname against itself and always
+    // failed with a message that named the same string on both sides -
+    // resolve it here too so the comparison is IP-to-IP either way.
+    const targetIp = isIP(connectedHost) ? connectedHost : await this.resolveHost(connectedHost);
+    if (domainIp && targetIp && domainIp === targetIp) {
       return { id: 'dns', status: 'ok' };
     }
     return {
@@ -137,6 +140,13 @@ export class Preflight {
       status: 'fail',
       detail: `${params.domain}'s A record does not point to ${connectedHost}`,
     };
+  }
+
+  /** Resolves a hostname to its first A-record IP via the server's own resolver, or null if it doesn't resolve. */
+  private async resolveHost(host: string): Promise<string | null> {
+    const result = await this.runner.run(`getent hosts ${shellQuote(host)}`);
+    const ip = result.stdout.trim().split(/\s+/)[0];
+    return ip || null;
   }
 
   private async checkAptLock(): Promise<CheckItem> {

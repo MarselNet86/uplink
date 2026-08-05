@@ -58,6 +58,30 @@ describe('Preflight', () => {
     expect(items.find((i) => i.id === 'dns')?.status).toBe('ok');
   });
 
+  it('resolves a hostname connectedHost too instead of comparing it to itself (BUG-09)', async () => {
+    const runner = makeHappyRunner();
+    runner.script("getent hosts 'vpn.example.com'", {
+      code: 0,
+      stdout: '203.0.113.10 vpn.example.com\n',
+    });
+    runner.script("getent hosts '203.0.113.10.sslip.io'", {
+      code: 0,
+      stdout: '203.0.113.10 203.0.113.10.sslip.io\n',
+    });
+
+    const { items } = await new Preflight(runner, 0).run(
+      {
+        distroHint: 'auto',
+        tlsMode: 'acme-domain',
+        domain: 'vpn.example.com',
+        acmeEmail: 'a@b.com',
+      },
+      '203.0.113.10.sslip.io',
+    );
+
+    expect(items.find((i) => i.id === 'dns')).toMatchObject({ status: 'ok' });
+  });
+
   it('warns when distroHint disagrees with the detected distro but trusts the fact', async () => {
     const runner = makeHappyRunner();
     const { items, distro } = await new Preflight(runner, 0).run(

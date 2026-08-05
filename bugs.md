@@ -174,3 +174,19 @@ the component; `deriveAutoDomain`/`deriveAutoAcmeEmail` stay in
 the form.
 
 Files: `src/renderer/src/features/connect/ConnectForm.tsx`.
+
+## BUG-09 - DNS check compares a hostname against itself
+
+**Cause:** `checkDns()` resolved the domain via `getent hosts` and compared
+the result to `connectedHost` directly - correct when the user connects by
+IP, but when they connect by hostname (e.g. a sslip.io name) the check
+compared that hostname string to itself and always failed, even when the
+domain's A record was genuinely correct. Live: `31.207.77.243.sslip.io's A
+record does not point to 31.207.77.243.sslip.io`.
+
+**Fix:** `connectedHost` is now resolved the same way the domain is
+(`getent hosts`) whenever it isn't already an IP (`node:net`'s `isIP()`),
+so the comparison is always IP-to-IP. Added a regression test for the
+hostname-connected case.
+
+Files: `src/main/domain/Preflight.ts`, `tests/unit/Preflight.test.ts`.
