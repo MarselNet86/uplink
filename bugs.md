@@ -151,3 +151,26 @@ code that already fits the "user chose not to proceed" case exactly, no
 contract change needed.
 
 Files: `src/main/ssh/SshSession.ts`.
+
+## BUG-07 (and BUG-08) - self-signed is unreachable from the UI
+
+**Cause:** `tech.md` section 4 specifies self-signed as the actual default:
+Hysteria2 should only switch to `acme-domain` when the user explicitly
+checks "use my own domain". `ConnectForm.submit()` instead always computed
+`domain` from `deriveAutoDomain(values.host)` regardless of the checkbox,
+which returns a non-empty `<ip>.sslip.io` for every IPv4 host - so
+`acme-domain` (and the sslip.io/Let's Encrypt dependency, and its weekly
+issuance limit) was selected for essentially every real install, and the
+checkbox's own unchecked state was silently ignored. This is also BUG-08's
+root cause (the same forced ACME path burns the rate limit on ordinary use).
+
+**Fix:** `domain`/`acmeEmail` are now only ever taken from the form's own
+fields, and only when `domainOverride` is true - matching tech.md's
+described behavior exactly. Rewrote the collapsible's copy to describe the
+real default (self-signed, no domain) instead of a domain that was said to
+be used automatically. Removed the now-unused sslip.io auto-fill path from
+the component; `deriveAutoDomain`/`deriveAutoAcmeEmail` stay in
+`formValidation.ts` as tested pure functions, just no longer invoked from
+the form.
+
+Files: `src/renderer/src/features/connect/ConnectForm.tsx`.

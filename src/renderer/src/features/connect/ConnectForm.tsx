@@ -6,7 +6,7 @@ import { Collapsible } from '../../ui/Collapsible';
 import { Input } from '../../ui/Input';
 import { PasswordInput } from '../../ui/PasswordInput';
 import { ErrorDetailsModal } from '../common/ErrorDetailsModal';
-import { deriveAutoAcmeEmail, deriveAutoDomain, validateConnectForm } from './formValidation';
+import { validateConnectForm } from './formValidation';
 import type { ConnectFormErrors, ConnectFormValues } from './formValidation';
 
 const initialValues: ConnectFormValues = {
@@ -34,12 +34,6 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
   const set = <K extends keyof ConnectFormValues>(key: K, value: ConnectFormValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }));
 
-  // Recomputed every render from the current host - sslip.io needs no
-  // registration, so this is the zero-input default for Hysteria2's
-  // trusted-cert mode. '' means the host doesn't fit either auto case
-  // (not IPv4, not already a domain), and self-signed is used instead.
-  const autoDomain = deriveAutoDomain(values.host);
-
   const submit = async () => {
     const fieldErrors = validateConnectForm(values);
     setErrors(fieldErrors);
@@ -54,12 +48,11 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
         ...(values.realitySni.trim() ? { realitySni: values.realitySni.trim() } : {}),
         ...(values.hysteriaSni.trim() ? { hysteriaSni: values.hysteriaSni.trim() } : {}),
       };
-      const domain = values.domainOverride ? values.domain.trim() : autoDomain;
-      const acmeEmail = values.domainOverride
-        ? values.acmeEmail.trim()
-        : domain
-          ? deriveAutoAcmeEmail(domain)
-          : '';
+      // BUG-07/BUG-08: self-signed is the actual default (tech.md section
+      // 4) - a domain (and therefore acme-domain) is only ever used once
+      // the user explicitly opts in via the checkbox.
+      const domain = values.domainOverride ? values.domain.trim() : '';
+      const acmeEmail = values.domainOverride ? values.acmeEmail.trim() : '';
       // Distro is always auto-detected server-side (Preflight); the form
       // never asked the user for it, so there is nothing to override here.
       const params: DeployParams = domain
@@ -120,28 +113,15 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
         />
       </div>
 
-      <Collapsible title="Domain for Hysteria2 · automatic">
+      <Collapsible title="Domain for Hysteria2 · optional">
         <p className="field-hint" style={{ marginBottom: 'var(--s2)' }}>
-          {autoDomain ? (
-            <>
-              The domain <code>{autoDomain}</code> and a trusted Let&apos;s Encrypt certificate will
-              be used, free and with no registration.
-            </>
-          ) : (
-            'An automatic domain is not available for this host (it does not look like an IPv4 address or a domain) - a self-signed certificate will be used instead.'
-          )}
+          By default Hysteria2 uses a self-signed certificate - no domain needed. Check the box
+          below only if you already have your own domain pointed at this server, to get a trusted
+          Let&apos;s Encrypt certificate instead.
         </p>
         <Checkbox
           checked={values.domainOverride}
-          onCheckedChange={(checked) => {
-            set('domainOverride', checked);
-            if (checked) {
-              if (!values.domain.trim()) set('domain', autoDomain);
-              if (!values.acmeEmail.trim() && autoDomain) {
-                set('acmeEmail', deriveAutoAcmeEmail(autoDomain));
-              }
-            }
-          }}
+          onCheckedChange={(checked) => set('domainOverride', checked)}
           label="Use my own domain"
           description="Only if you already have your own domain pointed at this server"
         />
