@@ -2,6 +2,8 @@ import { app, BrowserWindow, nativeTheme, session, shell } from 'electron';
 import { join } from 'node:path';
 import { is } from '@electron-toolkit/utils';
 import { registerIpcHandlers } from './ipc/registry';
+import { requestCancelAll } from './pipeline/runRegistry';
+import { disposeAllSessions } from './ssh/sessionRegistry';
 
 /** Domains allowed to be opened in the OS browser via shell.openExternal. */
 const EXTERNAL_URL_ALLOWLIST = new Set<string>(['github.com', 't.me']);
@@ -41,6 +43,19 @@ function createWindow(): BrowserWindow {
       shell.openExternal(url);
     }
     return { action: 'deny' };
+  });
+
+  // BUG-03: closing the window via its own close button did not stop an
+  // in-flight install/remove or close its SSH session - on macOS the
+  // process keeps running after `window-all-closed` with no window left to
+  // show progress in, and the run completed entirely unseen. Cancelling
+  // stops any step that hasn't started yet; disposing every session aborts
+  // whatever step is currently running by killing its connection outright,
+  // since a merely-cancelled Pipeline still lets that step finish on its
+  // own (tech.md 5.12).
+  win.on('close', () => {
+    requestCancelAll();
+    disposeAllSessions();
   });
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {

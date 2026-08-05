@@ -39,3 +39,14 @@ export function disposeSession(sessionId: string): void {
   entry.session.dispose();
   sessions.delete(sessionId);
 }
+
+/**
+ * Tears down every live session (BUG-03): closing the window has no single
+ * sessionId to target, and a merely-cancelled Pipeline still lets its
+ * currently-running step finish on its own (tech.md 5.12) - disposing the
+ * connection outright is what actually stops an in-flight command instead
+ * of letting the whole run complete unseen in the background.
+ */
+export function disposeAllSessions(): void {
+  for (const sessionId of [...sessions.keys()]) disposeSession(sessionId);
+}

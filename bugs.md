@@ -369,3 +369,31 @@ reachable.
 
 Files: `src/main/domain/CertGenerator.ts`, `src/main/ipc/handlers/installStart.ts`,
 `tests/unit/CertGenerator.test.ts`.
+
+## BUG-03 - closing the window doesn't stop the run or close SSH (blocker)
+
+**Cause:** No handler on the window's own `close` event ever cancelled an
+in-flight `Pipeline` or disposed its `SshSession`. On macOS,
+`window-all-closed` doesn't call `app.quit()` (by design, so `Cmd+Q` and the
+window's close button behave differently) - so closing the window via its
+own button left the process alive with no window to show progress in,
+while the install/remove pipeline ran to completion entirely unseen. `Cmd+Q`
+(`app.quit()`) already stopped everything correctly, since the whole
+process exits; the close button was the one path that let a run finish
+silently in the background - confirmed live three times, on the early,
+middle, and late steps of an install.
+
+**Fix:** `createWindow()` now attaches a `close` listener that requests
+cancellation of every tracked run (new `runRegistry.requestCancelAll()`)
+and disposes every live SSH session (new
+`sessionRegistry.disposeAllSessions()`). Cancelling alone only stops a step
+that hasn't started yet (tech.md 5.12: the currently-running step always
+finishes on its own) - disposing the session is what actually aborts an
+in-flight command, by killing the connection it depends on. Verified live:
+launched the built app, closed its window via CDP (`page.close()`, the same
+close path as the window's own button) with no crash and no window left
+behind; the process stayed alive as before (expected on macOS, unchanged),
+and closing it produced no exception in the process log.
+
+Files: `src/main/index.ts`, `src/main/pipeline/runRegistry.ts`,
+`src/main/ssh/sessionRegistry.ts`.
