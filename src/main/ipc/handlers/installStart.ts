@@ -4,13 +4,23 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { IPC } from '@shared/ipc';
 import { installRequestSchema } from '@shared/schemas';
 import { encodeAppError } from '@shared/ipcError';
-import type { AppError, DeployParams, InstallRequest, ProtocolId, RunHandle } from '@shared/types';
+import type {
+  AppError,
+  CheckId,
+  DeployParams,
+  InstallRequest,
+  ProtocolId,
+  RunHandle,
+} from '@shared/types';
 import type { ErrorCode } from '@shared/errors';
 import type { SshSession } from '../../ssh/SshSession';
 import { getSession } from '../../ssh/sessionRegistry';
 import { BaseInstaller } from '../../domain/installers/BaseInstaller';
 import { Hysteria2Installer } from '../../domain/installers/Hysteria2Installer';
+import { InstallerError } from '../../domain/installers/InstallerError';
 import { XrayRealityInstaller } from '../../domain/installers/XrayRealityInstaller';
+import { Preflight } from '../../domain/Preflight';
+import { ProtocolDetector } from '../../domain/ProtocolDetector';
 import { BaseRemover } from '../../domain/removers/BaseRemover';
 import { Hysteria2Remover } from '../../domain/removers/Hysteria2Remover';
 import { XrayRemover } from '../../domain/removers/XrayRemover';
@@ -46,16 +56,62 @@ const REMOVER_FACTORIES: Partial<
   hysteria2: (session, host) => new Hysteria2Remover(session.getCommandRunner(), host),
 };
 
+/**
+ * Maps a failed preflight CheckId to its ErrorCode (BUG-02/BUG-23): only
+ * the checks that can genuinely fail here (tech.md 5.4 items 3, 6-10 -
+ * distro/arch never produce 'fail', tcp/auth are resolved before a runner
+ * even exists) need an entry.
+ */
+const PREFLIGHT_ERROR_CODES: Partial<Record<CheckId, ErrorCode>> = {
+  privileges: 'E_NO_SUDO',
+  systemd: 'E_NO_SYSTEMD',
+  outbound: 'E_NO_OUTBOUND',
+  ports: 'E_PORT_BUSY',
+  dns: 'E_DNS_MISMATCH',
+  'apt-lock': 'E_APT_LOCKED',
+};
+
 function throwAppError(code: ErrorCode, message: string): never {
   const appError: AppError = { code, message };
   throw new Error(encodeAppError(appError));
 }
 
-export function handleInstallStart(event: IpcMainInvokeEvent, payload: unknown): RunHandle {
+/**
+ * Refuses to start an install against a protocol the server doesn't
+ * actually report as `absent` (BUG-23: E_ALREADY_INSTALLED/E_FOREIGN_CONFIG
+ * were declared in the error contract but never reachable - the only
+ * enforcement was the renderer disabling the checkbox, tech.md 5.5's own
+ * `PlanBuilder` rule was never re-checked server-side). Reinstall is
+ * exempt: it exists precisely to act on a protocol that is already there.
+ */
+async function assertInstallable(session: SshSession, protocols: ProtocolId[]): Promise<void> {
+  const statuses = await new ProtocolDetector(session.getCommandRunner()).detect();
+  for (const protocol of protocols) {
+    const status = statuses.find((s) => s.protocol === protocol);
+    if (status?.state === 'foreign') {
+      throwAppError(
+        'E_FOREIGN_CONFIG',
+        `${protocol} has a foreign, unmanaged config on the server`,
+      );
+    }
+    if (status && status.state !== 'absent') {
+      throwAppError('E_ALREADY_INSTALLED', `${protocol} is already present on the server`);
+    }
+  }
+}
+
+export async function handleInstallStart(
+  event: IpcMainInvokeEvent,
+  payload: unknown,
+): Promise<RunHandle> {
   const request = installRequestSchema.parse(payload) as InstallRequest;
   const session = getSession(request.sessionId);
   if (!session) {
     throwAppError('E_UNKNOWN', 'session not found, please check the server again');
+  }
+
+  if (request.mode === 'install') {
+    await assertInstallable(session, request.protocols);
   }
 
   const runId = randomUUID();
@@ -89,15 +145,26 @@ async function runInstall(
 
   const isReinstall = request.mode === 'reinstall';
 
-  // Already validated at ssh:check within this same session (tech.md 5.4);
-  // this step exists purely so the progress bar/step list account for it,
-  // matching the weight table in tech.md 5.11.
+  // Re-runs the preflight checks (tech.md 5.4) rather than trusting the
+  // ssh:check snapshot from earlier in the session: server state (a port,
+  // apt lock, systemd) can change in the time the user spends on step 2,
+  // and this is also the only server-side enforcement of a failed check -
+  // previously a no-op, so a failed preflight never actually blocked
+  // installation (BUG-02) and four of its ErrorCodes were unreachable
+  // dead code (BUG-23).
   const preflightStep: Step = {
     id: 'preflight',
     title: 'Checking server',
     weight: 5,
     critical: true,
-    run: async () => {},
+    run: async () => {
+      const { items } = await new Preflight(session.getCommandRunner()).run(request.params, host);
+      const failed = items.find((item) => item.status === 'fail');
+      if (failed) {
+        const code = PREFLIGHT_ERROR_CODES[failed.id] ?? 'E_UNKNOWN';
+        throw new InstallerError(code, failed.detail ?? `${failed.id} check failed`);
+      }
+    },
   };
 
   let steps: Step[];

@@ -1,5 +1,6 @@
 import { shellQuote } from '../security/shellQuote';
 import type { ICommandRunner } from '../ssh/types';
+import { InstallerError } from './installers/InstallerError';
 import { parseCertFingerprint } from './parsers/certFingerprint';
 
 const KEY_PATH = '/etc/hysteria/server.key';
@@ -38,10 +39,22 @@ export async function generateSelfSignedCert(
   runner: ICommandRunner,
   commonName: string,
 ): Promise<GeneratedCert> {
-  await runner.runPrivileged(
+  const keygen = await runner.runPrivileged(
     `openssl ecparam -genkey -name prime256v1 -out ${shellQuote(KEY_PATH)}`,
   );
-  await runner.runPrivileged(
+  // None of these openssl steps' exit codes were ever checked (BUG-23:
+  // E_CERT_GENERATION_FAILED was declared in the contract but never
+  // reachable) - a failure here silently produced a missing/empty key or
+  // cert, and parseCertFingerprint's own exception on the garbage result
+  // surfaced as an unrelated generic error instead of naming the real cause.
+  if (keygen.code !== 0) {
+    throw new InstallerError(
+      'E_CERT_GENERATION_FAILED',
+      `openssl ecparam failed: ${keygen.stderr}`,
+    );
+  }
+
+  const certgen = await runner.runPrivileged(
     `openssl req -new -x509 -days ${CERT_DAYS} -key ${shellQuote(KEY_PATH)} ` +
       `-out ${shellQuote(CERT_PATH)} -subj ${shellQuote(`/CN=${commonName}`)} ` +
       `-addext ${shellQuote(`subjectAltName=DNS:${commonName}`)} ` +
@@ -49,6 +62,10 @@ export async function generateSelfSignedCert(
       `-addext ${shellQuote('keyUsage=critical,digitalSignature')} ` +
       `-addext ${shellQuote('extendedKeyUsage=serverAuth')}`,
   );
+  if (certgen.code !== 0) {
+    throw new InstallerError('E_CERT_GENERATION_FAILED', `openssl req failed: ${certgen.stderr}`);
+  }
+
   // Generated as root over the exec channel, but hysteria-server.service
   // reads these as its own `hysteria` user (same hazard as the config file
   // in Hysteria2Installer.writeConfig) - chmod alone leaves them unreadable.
@@ -60,6 +77,12 @@ export async function generateSelfSignedCert(
   const fingerprintResult = await runner.runPrivileged(
     `openssl x509 -noout -fingerprint -sha256 -in ${shellQuote(CERT_PATH)}`,
   );
+  if (fingerprintResult.code !== 0) {
+    throw new InstallerError(
+      'E_CERT_GENERATION_FAILED',
+      `openssl x509 -fingerprint failed: ${fingerprintResult.stderr}`,
+    );
+  }
   return {
     keyPath: KEY_PATH,
     certPath: CERT_PATH,

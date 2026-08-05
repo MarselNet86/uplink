@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CheckId, CheckResult, ProtocolId, ProtocolState } from '@shared/types';
 import { PlanBuilder } from '@shared/planBuilder';
+import { Alert } from '../../ui/Alert';
 import { Button } from '../../ui/Button';
 import { Checkbox } from '../../ui/Checkbox';
 import { Collapsible } from '../../ui/Collapsible';
@@ -179,13 +180,25 @@ export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepPr
         </dl>
       </Collapsible>
 
+      {/* BUG-02: a failed check (e.g. a busy port) never actually blocked
+          installation - the button stayed enabled and the run failed much
+          later, deep into the pipeline, without pointing back at the check
+          that already knew. main now refuses the same way server-side
+          (installStart.ts's preflight step); this is just the immediate,
+          same-screen feedback. */}
+      {!result.preflight.passed && (
+        <Alert tone="error" title="Server checks failed">
+          Fix the failed check above before installing.
+        </Alert>
+      )}
+
       <div className="split-foot">
         <Button variant="secondary" onClick={onBack}>
           Back
         </Button>
         <Button
           variant="primary"
-          disabled={!plan.canInstall}
+          disabled={!plan.canInstall || !result.preflight.passed}
           onClick={() => onInstall(plan.installable)}
         >
           Install

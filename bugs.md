@@ -309,3 +309,63 @@ Files: `src/renderer/src/features/common/ErrorDetailsModal.tsx`,
 `src/main/domain/installers/XrayRealityInstaller.ts`,
 `src/main/domain/installers/Hysteria2Installer.ts`,
 `tests/unit/XrayRealityInstaller.test.ts`.
+
+## BUG-02 (and BUG-23) - a failed preflight never actually blocks installation
+
+**Cause:** `installStart.ts`'s `preflightStep` was a literal no-op
+(`run: async () => {}`) with a comment saying the check was "already done at
+ssh:check" - but nothing anywhere read `CheckResult.preflight.passed`
+either, on either side of the IPC boundary. A server with a busy port or a
+locked apt would run the entire install pipeline anyway and fail much
+later, deep in an unrelated step, never pointing back at the check that
+already knew the real reason. The same gap meant four of the 22 declared
+`ErrorCode`s (`E_NO_SYSTEMD`, `E_NO_OUTBOUND`, `E_APT_LOCKED`,
+`E_PORT_BUSY`) could never actually be thrown anywhere (BUG-23) - preflight
+findings never became pipeline errors, they only ever sat as informational
+`CheckItem`s.
+
+**Fix:**
+- `installStart.ts`'s `preflightStep` now re-runs `Preflight` against the
+  current server state (state can change between `ssh:check` and clicking
+  Install) and throws the mapped `ErrorCode` for the first failed check -
+  this is the actual server-side enforcement point, not just a UI gate.
+- `SelectStep.tsx` also disables the Install button and shows an inline
+  alert when `preflight.passed` is false, for immediate same-screen
+  feedback instead of waiting on a round trip.
+- Fixed a related gap this surfaced in `buildRunResult()`: a step shared
+  across every protocol (like the new `preflight` check, or the existing
+  `backup` step) isn't "owned" by any single unit, so its failure used to
+  report as a generic "skipped because another protocol failed" for every
+  protocol instead of the real error - `toAppError()`'s `InstallerError`/
+  `CommandRunnerError` handling is protocol-agnostic, so any unit's mapper
+  now gets used when nothing specifically owns the failing step.
+
+Files: `src/main/ipc/handlers/installStart.ts`, `src/main/ipc/runOrchestration.ts`,
+`src/renderer/src/features/select/SelectStep.tsx`, `tests/unit/runOrchestration.test.ts`.
+
+## BUG-23, continued - the remaining three dead error codes
+
+Three more of the 22 declared codes were also never reachable:
+
+- **`E_CERT_GENERATION_FAILED`**: `CertGenerator.generateSelfSignedCert()`
+  never checked any of its `openssl` commands' exit codes. A failure
+  silently produced a missing/empty key or certificate, and
+  `parseCertFingerprint`'s own exception on the resulting garbage surfaced
+  as an unrelated generic error instead of naming the real cause. Now
+  checks each step and throws `E_CERT_GENERATION_FAILED` with the actual
+  stderr.
+- **`E_ALREADY_INSTALLED` / `E_FOREIGN_CONFIG`**: these describe pipeline
+  errors in the contract, but the only enforcement was the renderer
+  disabling the checkbox for a non-absent protocol (`PlanBuilder`) - main
+  never re-checked this itself, so a stale UI state or a direct IPC call
+  could install over an already-installed or foreign protocol with no
+  server-side objection. `installStart.ts` now re-detects protocol status
+  before starting an `install`-mode run (exempting `reinstall`, which
+  exists precisely to act on a non-absent protocol) and refuses with the
+  matching code.
+
+Together with BUG-02's fix, all 7 previously-dead codes are now genuinely
+reachable.
+
+Files: `src/main/domain/CertGenerator.ts`, `src/main/ipc/handlers/installStart.ts`,
+`tests/unit/CertGenerator.test.ts`.

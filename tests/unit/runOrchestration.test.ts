@@ -254,6 +254,42 @@ describe('buildRunResult', () => {
     expect(result.diagnostics).toContain('bad config');
   });
 
+  it('failed: a step no unit owns (preflight/backup) reports the real error to every unit, not "skipped"', () => {
+    const first = unit({
+      protocolId: 'vless-reality',
+      ownsStep: () => false,
+      toAppError: () => ({ code: 'E_APT_LOCKED', message: 'apt is locked by another process' }),
+    });
+    const second = unit({
+      protocolId: 'hysteria2',
+      ownsStep: () => false,
+      toAppError: () => ({ code: 'E_APT_LOCKED', message: 'apt is locked by another process' }),
+    });
+    const sink = new RunTrackingSink(recordingSink(), [first, second]);
+
+    const result = buildRunResult(
+      'run-1',
+      { status: 'failed', stepId: 'preflight' as StepId, error: new Error('apt is locked') },
+      [first, second],
+      sink,
+      [],
+      [],
+    );
+
+    expect(result.outcomes).toEqual([
+      {
+        protocol: 'vless-reality',
+        ok: false,
+        error: { code: 'E_APT_LOCKED', message: 'apt is locked by another process' },
+      },
+      {
+        protocol: 'hysteria2',
+        ok: false,
+        error: { code: 'E_APT_LOCKED', message: 'apt is locked by another process' },
+      },
+    ]);
+  });
+
   it('appends an E_UNKNOWN outcome for every unsupported protocol', () => {
     const sink = new RunTrackingSink(recordingSink(), []);
     const result = buildRunResult('run-1', { status: 'completed' }, [], sink, ['hysteria2'], []);

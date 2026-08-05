@@ -238,9 +238,17 @@ export function buildRunResult(
     });
   } else {
     diagnostics = redact(String(pipelineResult.error));
+    // Steps shared across every protocol in the run (preflight, backup)
+    // aren't owned by any single unit - previously that meant their failure
+    // reported as a per-protocol "skipped because another protocol failed"
+    // for every one of them, hiding the real, equally-applicable error
+    // behind a placeholder. toAppError()'s InstallerError/CommandRunnerError
+    // handling is protocol-agnostic, so any unit's mapper gives the right
+    // result when nothing actually owns the failing step.
+    const owningUnit = units.find((u) => u.ownsStep(pipelineResult.stepId));
     outcomes = units.map((u) => {
       if (completedUnits.has(u)) return u.getOutcome();
-      if (u.ownsStep(pipelineResult.stepId)) {
+      if (!owningUnit || u === owningUnit) {
         return { protocol: u.protocolId, ok: false, error: u.toAppError(pipelineResult.error) };
       }
       return {
