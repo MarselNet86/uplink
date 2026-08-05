@@ -20,7 +20,9 @@ const INSTALL_RETRY_DELAYS_MS = [5_000, 15_000, 30_000];
 const INSTALL_TIMEOUT_MS = 600_000;
 const VERIFY_POLL_INTERVAL_MS = 5_000;
 const ACME_MAX_WAIT_MS = 180_000;
-const SERVICE_START_MAX_WAIT_MS = 15_000;
+// 15s (BUG-14, same fix as XrayRealityInstaller) was too tight on a loaded
+// or slow server for the self-signed branch's non-ACME verify.
+const SERVICE_START_MAX_WAIT_MS = 30_000;
 
 function yamlConfig(body: { tlsOrAcme: string; password: string }): string {
   return (

@@ -20,6 +20,9 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
  */
 const SERVICE_CONFIRM_DELAY_MS = 3_000;
 
+/** apt-get update/install budget (BUG-04) - see installAptPackages(). */
+const APT_TIMEOUT_MS = 300_000;
+
 function toStep(spec: StepSpec, run: () => Promise<void>): Step {
   return { id: spec.id, title: spec.title, weight: spec.weight, critical: true, run };
 }
@@ -225,11 +228,19 @@ export abstract class BaseInstaller {
    * `apt-get update` + `install` for a fixed package list (tech.md 10.2:
    * "apt-get install is called from a single place") - both installers call
    * this instead of hand-rolling the same two-line invocation.
+   *
+   * Explicit timeout, not the 60s default (BUG-04): `apt-get update` alone
+   * confirmed live at 3-4 minutes on a real, un-throttled budget VPS whose
+   * hosting provider configures several mirrors at once - the 60s default
+   * failed this step long before anything was actually wrong.
    */
   protected async installAptPackages(packages: string[]): Promise<void> {
-    await this.runner.runPrivileged('DEBIAN_FRONTEND=noninteractive apt-get update -qq');
+    await this.runner.runPrivileged('DEBIAN_FRONTEND=noninteractive apt-get update -qq', {
+      timeoutMs: APT_TIMEOUT_MS,
+    });
     await this.runner.runPrivileged(
       `DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ${packages.map(shellQuote).join(' ')}`,
+      { timeoutMs: APT_TIMEOUT_MS },
     );
   }
 

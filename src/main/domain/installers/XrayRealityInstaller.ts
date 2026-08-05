@@ -14,7 +14,9 @@ export const XRAY_INSTALL_SCRIPT =
 const DOWNLOAD_RETRY_DELAYS_MS = [5_000, 15_000, 30_000];
 const DOWNLOAD_TIMEOUT_MS = 600_000;
 const VERIFY_POLL_INTERVAL_MS = 1_000;
-const SERVICE_START_MAX_WAIT_MS = 15_000;
+// 15s (BUG-14) was too tight for a loaded or slow server to finish binding
+// its socket before verify() gave up and reported a correct install as failed.
+const SERVICE_START_MAX_WAIT_MS = 30_000;
 
 interface XrayConfig {
   log: { loglevel: string };
@@ -156,7 +158,28 @@ export class XrayRealityInstaller extends BaseInstaller {
     const shortIdResult = await this.runner.run("od -An -tx1 -N8 /dev/urandom | tr -d ' \\n'");
     this.shortId = shortIdResult.stdout.trim();
 
-    this.sni = await this.selectDonor();
+    try {
+      this.sni = await this.selectDonor();
+    } catch (err) {
+      // The donor check itself needs the xray binary (X4 runs `xray tls
+      // ping`), so it cannot run before installCore() - but nothing durable
+      // has been written yet (writeConfig/start haven't run), so a failure
+      // here should not leave a dangling, unconfigured install behind
+      // (BUG-05: previously did exactly that).
+      await this.removeUnconfiguredCore();
+      throw err;
+    }
+  }
+
+  /** Best-effort cleanup for a donor-check failure (BUG-05): the original error is what gets reported either way. */
+  private async removeUnconfiguredCore(): Promise<void> {
+    try {
+      await this.runner.runPrivileged('systemctl disable --now xray');
+      await this.runner.runPrivileged('rm -f /usr/local/bin/xray');
+      await this.runner.runPrivileged('rm -rf /usr/local/etc/xray /usr/local/share/xray');
+    } catch {
+      // Best-effort only - swallow so the original donor error still wins.
+    }
   }
 
   // X4: first candidate that passes both donor checks. A user-supplied SNI

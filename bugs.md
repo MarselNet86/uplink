@@ -62,3 +62,46 @@ returns success if both checks agree. Factored the check itself into
 `isActiveAndBound()` so the retry doesn't duplicate the polling logic.
 
 Files: `src/main/domain/installers/BaseInstaller.ts`.
+
+## BUG-04 - apt-get timeout too short for its own budget
+
+**Cause:** `apt-get update`/`install` ran with `CommandRunner`'s 60s default
+timeout, while the core-download step right after it gets 600s. Live: a
+budget VPS with several apt mirrors configured took 3-4 minutes for
+`apt-get update` alone with no throttling involved - the 60s budget failed
+this step long before there was anything actually wrong.
+
+**Fix:** `installAptPackages()` now passes an explicit 300s timeout for both
+commands.
+
+Files: `src/main/domain/installers/BaseInstaller.ts`.
+
+## BUG-05 - a bad Reality donor leaves an installed-but-unconfigured Xray core behind
+
+**Cause:** Donor selection (X4) runs in `generateSecrets()`, after
+`installCore()`, because the check itself shells out to `xray tls ping` -
+it needs the binary to exist. A failing donor check therefore always left
+Xray installed on the server with no config and no running service.
+
+**Fix:** Reordering the check itself isn't possible without replacing `xray
+tls ping` with a hand-rolled TLS probe (out of scope, and a contract change
+per tech.md 5.6 X4). Instead, `generateSecrets()` now catches a donor-check
+failure and removes the just-installed, still-unconfigured core
+(`systemctl disable --now xray`, delete the binary and `/usr/local/etc/xray`)
+before re-throwing the original error - best-effort, and never masks the
+real `E_NO_REALITY_DONOR`.
+
+Files: `src/main/domain/installers/XrayRealityInstaller.ts`.
+
+## BUG-14 - 15s service-verify wait too short
+
+**Cause:** Both `XrayRealityInstaller` and `Hysteria2Installer`'s
+self-signed branch gave `waitForService()` only 15s to see the unit become
+active and bound. On a loaded or slow server the daemon can take longer
+than that to bind its socket, which would fail a perfectly good install
+with `E_SERVICE_FAILED`.
+
+**Fix:** Raised `SERVICE_START_MAX_WAIT_MS` to 30s in both installers.
+
+Files: `src/main/domain/installers/XrayRealityInstaller.ts`,
+`src/main/domain/installers/Hysteria2Installer.ts`.
