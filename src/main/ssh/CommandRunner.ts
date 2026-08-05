@@ -100,15 +100,12 @@ export class CommandRunner implements ICommandRunner {
 
         // Backstop beyond the server-side `timeout` (+ its kill-after grace)
         // in case the channel itself never reports back at all.
-        const timer = setTimeout(
-          () => {
-            if (settled) return;
-            settled = true;
-            stream.close();
-            reject(new CommandRunnerError('E_TIMEOUT', `command timed out after ${timeoutMs}ms`));
-          },
-          timeoutMs + 15_000,
-        );
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          stream.close();
+          reject(new CommandRunnerError('E_TIMEOUT', `command timed out after ${timeoutMs}ms`));
+        }, timeoutMs + 15_000);
 
         stream.on('data', (chunk: Buffer) => {
           stdout = appendCapped(stdout, chunk.toString('utf8'), MAX_OUTPUT_BYTES);
