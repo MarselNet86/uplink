@@ -11,6 +11,7 @@ import { UnsupportedArchError, UnsupportedDistroError } from '../../domain/Distr
 import { Preflight } from '../../domain/Preflight';
 import { ProtocolDetector } from '../../domain/ProtocolDetector';
 import { TokenExtractor } from '../../domain/TokenExtractor';
+import { classifySshError } from '../../ssh/classifySshError';
 import { HostKeyStore } from '../../ssh/HostKeyStore';
 import { SshConnectError, SshSession } from '../../ssh/SshSession';
 import { registerSession } from '../../ssh/sessionRegistry';
@@ -93,7 +94,11 @@ export async function handleSshCheck(
     if (err instanceof UnsupportedArchError) {
       throwAppError('E_ARCH_UNSUPPORTED', `unsupported architecture: ${err.rawArch}`);
     }
-    throwAppError('E_UNKNOWN', err instanceof Error ? err.message : 'unknown preflight error');
+    // Same reasoning as BaseInstaller/BaseRemover.toAppError (BUG-06/BUG-15):
+    // a raw ssh2/network error dropped mid-preflight deserves a real code,
+    // not an automatic E_UNKNOWN.
+    const message = err instanceof Error ? err.message : 'unknown preflight error';
+    throwAppError(classifySshError(message), message);
   }
 
   const items: CheckItem[] = [tcpItem, { id: 'auth', status: 'ok' }, ...preflightItems];

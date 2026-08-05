@@ -1,6 +1,7 @@
 import { Client } from 'ssh2';
 import type { ServerCredentials } from '@shared/types';
 import type { ErrorCode } from '@shared/errors';
+import { classifySshError } from './classifySshError';
 import { CommandRunner } from './CommandRunner';
 import { FileTransfer } from './FileTransfer';
 import { HostKeyStore, computeFingerprint } from './HostKeyStore';
@@ -71,7 +72,7 @@ export class SshSession {
   ): Promise<SshSession> {
     return new Promise((resolve, reject) => {
       const client = new Client();
-      let hostKeyRejected = false;
+      let hostKeyOutcome: HostKeyOutcome = 'accepted';
       let settled = false;
 
       client.on('ready', () => {
@@ -84,7 +85,7 @@ export class SshSession {
         if (settled) return;
         settled = true;
         client.end();
-        reject(mapConnectError(err, hostKeyRejected));
+        reject(mapConnectError(err, hostKeyOutcome));
       });
 
       client.connect({
@@ -103,9 +104,9 @@ export class SshSession {
             credentials.port,
             fingerprint,
             onUnknownHostKey,
-          ).then((accepted) => {
-            hostKeyRejected = !accepted;
-            verify(accepted);
+          ).then((outcome) => {
+            hostKeyOutcome = outcome;
+            verify(outcome === 'accepted');
           });
         },
       });
@@ -147,32 +148,56 @@ export class SshSession {
   }
 }
 
+/**
+ * 'declined-new' (user said no to a server with no stored fingerprint yet)
+ * is deliberately its own case, distinct from 'mismatch' (a stored
+ * fingerprint that no longer matches) - BUG-20: both used to collapse into
+ * the same boolean, so declining to trust a brand-new server showed the same
+ * "fingerprint has changed / possible MITM" alarm as an actual, dangerous
+ * mismatch.
+ */
+type HostKeyOutcome = 'accepted' | 'declined-new' | 'mismatch';
+
 async function resolveHostKeyDecision(
   hostKeyStore: HostKeyStore,
   host: string,
   port: number,
   fingerprint: string,
   onUnknownHostKey: (prompt: HostKeyPrompt) => Promise<boolean>,
-): Promise<boolean> {
+): Promise<HostKeyOutcome> {
   const decision = await hostKeyStore.check(host, port, fingerprint);
-  if (decision === 'match') return true;
-  if (decision === 'mismatch') return false;
+  if (decision === 'match') return 'accepted';
+  if (decision === 'mismatch') return 'mismatch';
 
   const accepted = await onUnknownHostKey({ host, port, fingerprint });
-  if (!accepted) return false;
+  if (!accepted) return 'declined-new';
   await hostKeyStore.trust(host, port, fingerprint);
-  return true;
+  return 'accepted';
 }
 
-function mapConnectError(err: SshErrorLike, hostKeyRejected: boolean): SshConnectError {
-  if (hostKeyRejected) {
+function mapConnectError(err: SshErrorLike, hostKeyOutcome: HostKeyOutcome): SshConnectError {
+  if (hostKeyOutcome === 'mismatch') {
     return new SshConnectError('E_SSH_HOSTKEY_MISMATCH', 'The server fingerprint has changed');
+  }
+  if (hostKeyOutcome === 'declined-new') {
+    return new SshConnectError('E_CANCELLED', 'Server fingerprint was not trusted');
   }
   if (err.level === 'client-authentication') {
     return new SshConnectError('E_SSH_AUTH', 'Failed to authenticate over SSH');
   }
   if (err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED' || err.code === 'EHOSTUNREACH') {
     return new SshConnectError('E_NET_UNREACHABLE', 'Server is unreachable');
+  }
+  if (err.level === 'client-timeout') {
+    return new SshConnectError('E_TIMEOUT', err.message || 'Timed out connecting to the server');
+  }
+  // Covers ssh2's own free-text failures with no stable level/code (BUG-15,
+  // confirmed live via four different triggers): a slow trust-dialog
+  // decision, a silently dropped connection, a wrong port, and a transient
+  // channel failure all used to collapse into E_UNKNOWN here.
+  const classified = classifySshError(err.message || '');
+  if (classified !== 'E_UNKNOWN') {
+    return new SshConnectError(classified, err.message || 'SSH connection error');
   }
   return new SshConnectError('E_UNKNOWN', err.message || 'Unknown SSH error');
 }

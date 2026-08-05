@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { AppError, ProtocolId, ProtocolOutcome, StepId } from '@shared/types';
 import { shellQuote } from '../../security/shellQuote';
 import type { Step } from '../../pipeline/Step';
+import { classifySshError } from '../../ssh/classifySshError';
 import { CommandRunnerError } from '../../ssh/CommandRunner';
 import type { ICommandRunner, IFileTransfer } from '../../ssh/types';
 import { findListener, parseListenPorts } from '../parsers/listenPorts';
@@ -326,14 +327,21 @@ export abstract class BaseInstaller {
 
   /** Maps a caught phase error to the frozen AppError shape (tech.md section 8). */
   toAppError(err: unknown): AppError {
-    if (err instanceof InstallerError) return { code: err.code, message: err.message };
+    if (err instanceof InstallerError) {
+      return err.hint
+        ? { code: err.code, message: err.message, hint: err.hint }
+        : { code: err.code, message: err.message };
+    }
     // CommandRunner throws its own typed error for sudo/timeout failures
     // (E_NO_SUDO, E_TIMEOUT) - without this check those collapse into an
     // unhelpful E_UNKNOWN and the real cause never reaches the user.
     if (err instanceof CommandRunnerError) return { code: err.code, message: err.message };
-    return {
-      code: 'E_UNKNOWN',
-      message: err instanceof Error ? err.message : 'unknown installer error',
-    };
+    const message = err instanceof Error ? err.message : 'unknown installer error';
+    // A raw ssh2/network error surfacing mid-install (BUG-06: a connection
+    // dropped after the session was already established) - classify it the
+    // same way a connect-time failure would be, rather than defaulting to
+    // E_UNKNOWN just because it didn't come from a typed error class.
+    const classified = classifySshError(message);
+    return { code: classified, message };
   }
 }

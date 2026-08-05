@@ -1,6 +1,7 @@
 import type { AppError, ProtocolId, ProtocolOutcome, StepId } from '@shared/types';
 import type { Step } from '../../pipeline/Step';
 import { shellQuote } from '../../security/shellQuote';
+import { classifySshError } from '../../ssh/classifySshError';
 import { CommandRunnerError } from '../../ssh/CommandRunner';
 import type { ICommandRunner } from '../../ssh/types';
 import { InstallerError } from '../installers/InstallerError';
@@ -93,11 +94,15 @@ export abstract class BaseRemover {
 
   /** Maps a caught removeCore() error to the frozen AppError shape (tech.md section 8). */
   toAppError(err: unknown): AppError {
-    if (err instanceof InstallerError) return { code: err.code, message: err.message };
+    if (err instanceof InstallerError) {
+      return err.hint
+        ? { code: err.code, message: err.message, hint: err.hint }
+        : { code: err.code, message: err.message };
+    }
     if (err instanceof CommandRunnerError) return { code: err.code, message: err.message };
-    return {
-      code: 'E_UNKNOWN',
-      message: err instanceof Error ? err.message : 'unknown remover error',
-    };
+    const message = err instanceof Error ? err.message : 'unknown remover error';
+    // Same reasoning as BaseInstaller.toAppError (BUG-06): classify a raw
+    // ssh2/network error before giving up and calling it E_UNKNOWN.
+    return { code: classifySshError(message), message };
   }
 }

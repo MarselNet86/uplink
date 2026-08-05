@@ -105,3 +105,49 @@ with `E_SERVICE_FAILED`.
 
 Files: `src/main/domain/installers/XrayRealityInstaller.ts`,
 `src/main/domain/installers/Hysteria2Installer.ts`.
+
+## BUG-15 (and BUG-06) - SSH-level failures collapse into E_UNKNOWN
+
+**Cause:** Every ssh2-level failure without an exact `err.level`/`err.code`
+match fell through to `E_UNKNOWN`/"Unknown error" - confirmed live four
+separate ways: a slow trust-dialog decision ("Timed out while waiting for
+handshake"), a silently unreachable host (same message), a plain wrong port
+("Connection lost before handshake"), and a transient channel failure
+("Channel open failure: open failed"). The same gap applies to a connection
+dropped mid-install after the session was already established (BUG-06,
+blocked from live confirmation by the tester's VPN, but the same missing
+classification either way): `BaseInstaller`/`BaseRemover.toAppError()` had
+no fallback beyond `instanceof InstallerError`/`CommandRunnerError`.
+
+**Fix:** New `classifySshError()` (`src/main/ssh/classifySshError.ts`)
+matches the exact wording confirmed live - timeout-shaped messages become
+`E_TIMEOUT`, connection-drop-shaped messages become `E_NET_UNREACHABLE` -
+and falls back to `E_UNKNOWN` only when nothing matches, never inventing a
+code it isn't reasonably sure of. Wired into `mapConnectError()` (connect
+time), `BaseInstaller`/`BaseRemover.toAppError()` (mid-run), and
+`sshCheck.ts`'s preflight catch block, so the same class of raw ssh2 error
+gets the same treatment everywhere it can surface. Also added the
+`client-timeout` level explicitly to `mapConnectError()`.
+
+Files: `src/main/ssh/classifySshError.ts` (new), `src/main/ssh/SshSession.ts`,
+`src/main/domain/installers/BaseInstaller.ts`,
+`src/main/domain/removers/BaseRemover.ts`, `src/main/ipc/handlers/sshCheck.ts`.
+
+## BUG-20 - declining to trust a new server looks like a real mismatch
+
+**Cause:** `resolveHostKeyDecision()` returned a plain boolean, `false` for
+both "this is a brand-new server and the user declined to trust it" and
+"the stored fingerprint no longer matches" (an actual, dangerous mismatch).
+`mapConnectError()` only saw that boolean, so declining a first-time
+connection showed the exact same "fingerprint has changed / possible
+MITM/OS reinstall" alarm as a genuine hijack - confirmed live.
+
+**Fix:** `resolveHostKeyDecision()` now returns a three-way
+`'accepted' | 'declined-new' | 'mismatch'` instead of a boolean.
+`mapConnectError()` maps `'mismatch'` to the existing
+`E_SSH_HOSTKEY_MISMATCH` alarm, unchanged, and `'declined-new'` to
+`E_CANCELLED` ("Server fingerprint was not trusted") - an existing contract
+code that already fits the "user chose not to proceed" case exactly, no
+contract change needed.
+
+Files: `src/main/ssh/SshSession.ts`.
