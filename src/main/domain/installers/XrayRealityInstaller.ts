@@ -135,7 +135,11 @@ export class XrayRealityInstaller extends BaseInstaller {
       DOWNLOAD_TIMEOUT_MS,
     );
     if (result.code !== 0) {
-      throw new InstallerError('E_DOWNLOAD_FAILED', 'xray install script failed after 3 attempts');
+      throw new InstallerError(
+        'E_DOWNLOAD_FAILED',
+        'xray install script failed after 3 attempts',
+        this.downloadFailureHint(result),
+      );
     }
     const exists = await this.runner.run('test -x /usr/local/bin/xray');
     const version = await this.runner.run('/usr/local/bin/xray version');
@@ -196,6 +200,12 @@ export class XrayRealityInstaller extends BaseInstaller {
       this.params?.realitySni
         ? `donor ${this.params.realitySni} failed the TLS 1.3 / certificate size checks`
         : 'no built-in reality donor passed the TLS 1.3 / certificate size checks',
+      // BUG-17/BUG-22: the static ERROR_TEXT hint always blames "the
+      // built-in candidates", which is simply wrong when a user-supplied
+      // SNI replaced that list entirely and was the only thing checked.
+      this.params?.realitySni
+        ? `${this.params.realitySni} failed the check - try a different donor domain.`
+        : undefined,
     );
   }
 

@@ -272,3 +272,40 @@ condition. `buildDiagnosticsReport()` already included the warnings section
 unconditionally, so no further change was needed.
 
 Files: `src/renderer/src/features/result/ResultStep.tsx`.
+
+## BUG-17/BUG-22 - E_NO_REALITY_DONOR hint always blames the built-in list
+
+**Cause:** `ERROR_TEXT['E_NO_REALITY_DONOR'].hint` is a single static string
+("None of the built-in candidates passed the check") shown regardless of
+whether the built-in list was actually checked, or a user-supplied SNI
+replaced it entirely and was the only thing checked. The correct
+distinction already existed in `InstallerError.message` (diagnostics-only,
+not shown as the primary hint) - `AppError.hint` was defined in the
+contract for exactly this and was never populated by anyone, nor ever read
+by the UI.
+
+**Fix:** `ErrorDetailsModal` now shows `error.hint` when the failure
+provided one, falling back to the static `ERROR_TEXT` hint otherwise.
+`XrayRealityInstaller.selectDonor()` now passes a donor-specific hint when
+`params.realitySni` was set, naming the actual domain that failed instead
+of blaming a list that was never consulted.
+
+## BUG-21 - E_DOWNLOAD_FAILED hint always blames the network
+
+**Cause:** Same static-hint gap as BUG-17/22, different code: `installCore()`
+in both installers threw `E_DOWNLOAD_FAILED` on any non-zero exit from the
+install script's retries, and the UI hint is hardcoded to "check the
+server's network connection" - live: a full disk (`No space left on
+device`) produced this exact same misleading advice.
+
+**Fix:** New `BaseInstaller.downloadFailureHint()` inspects the last failed
+attempt's stdout/stderr for the disk-full message and returns a matching
+hint; both installers now pass its result as `InstallerError`'s hint.
+Falls through to the static network-ish hint when nothing recognizable
+is found - never invents a cause it isn't sure of.
+
+Files: `src/renderer/src/features/common/ErrorDetailsModal.tsx`,
+`src/main/domain/installers/BaseInstaller.ts`,
+`src/main/domain/installers/XrayRealityInstaller.ts`,
+`src/main/domain/installers/Hysteria2Installer.ts`,
+`tests/unit/XrayRealityInstaller.test.ts`.

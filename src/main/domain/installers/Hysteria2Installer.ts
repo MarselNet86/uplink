@@ -153,6 +153,7 @@ export class Hysteria2Installer extends BaseInstaller {
       throw new InstallerError(
         'E_DOWNLOAD_FAILED',
         'hysteria install script failed after 3 attempts',
+        this.downloadFailureHint(result),
       );
     }
     const exists = await this.runner.run('test -x /usr/local/bin/hysteria');

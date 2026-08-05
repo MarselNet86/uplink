@@ -4,7 +4,7 @@ import { shellQuote } from '../../security/shellQuote';
 import type { Step } from '../../pipeline/Step';
 import { classifySshError } from '../../ssh/classifySshError';
 import { CommandRunnerError } from '../../ssh/CommandRunner';
-import type { ICommandRunner, IFileTransfer } from '../../ssh/types';
+import type { CommandResult, ICommandRunner, IFileTransfer } from '../../ssh/types';
 import { findListener, parseListenPorts } from '../parsers/listenPorts';
 import { parseIsActive } from '../parsers/systemctl';
 import { InstallerError } from './InstallerError';
@@ -243,6 +243,21 @@ export abstract class BaseInstaller {
       `DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ${packages.map(shellQuote).join(' ')}`,
       { timeoutMs: APT_TIMEOUT_MS },
     );
+  }
+
+  /**
+   * BUG-21: `E_DOWNLOAD_FAILED`'s static hint always blamed the network,
+   * even when the real cause (confirmed live) was a full disk. Called with
+   * the last failed attempt's output before throwing, so the specific
+   * cause - when recognizable - can override that generic hint instead of
+   * sending a user with a full disk off to check their network connection.
+   */
+  protected downloadFailureHint(result: CommandResult): string | undefined {
+    const output = `${result.stdout}\n${result.stderr}`;
+    if (/no space left on device/i.test(output)) {
+      return "The server's disk is full. Free up space and try again.";
+    }
+    return undefined;
   }
 
   /**

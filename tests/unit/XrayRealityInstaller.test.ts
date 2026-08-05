@@ -159,6 +159,22 @@ describe('XrayRealityInstaller - happy path', () => {
     expect(result.error?.code).toBe('E_NO_REALITY_DONOR');
   });
 
+  it('gives a donor-specific hint when a user-supplied SNI fails, not the built-in-list wording (BUG-17/BUG-22)', async () => {
+    const runner = makeHappyRunner();
+    runner.script("xray tls ping 'bad.donor.example'", { code: 1 });
+
+    const { outcome } = install(runner, new FakeFileTransfer(), {
+      distroHint: 'auto',
+      tlsMode: 'self-signed',
+      realitySni: 'bad.donor.example',
+    });
+    const result = await outcome;
+
+    expect(result.error?.hint).toBe(
+      'bad.donor.example failed the check - try a different donor domain.',
+    );
+  });
+
   it('warns instead of failing when ufw is not present', async () => {
     const runner = makeHappyRunner();
     const { installer, outcome } = install(runner);
@@ -181,6 +197,16 @@ describe('XrayRealityInstaller - error paths', () => {
       ok: false,
       error: { code: 'E_DOWNLOAD_FAILED', message: expect.any(String) },
     });
+  });
+
+  it('hints at a full disk instead of the network when that is what actually failed (BUG-21)', async () => {
+    const runner = makeHappyRunner();
+    runner.script(XRAY_INSTALL_SCRIPT, { code: 1, stderr: 'No space left on device\n' });
+
+    const { outcome } = install(runner);
+    const result = await outcome;
+
+    expect(result.error?.hint).toBe("The server's disk is full. Free up space and try again.");
   });
 
   it('returns E_NO_REALITY_DONOR when every built-in donor fails tls ping', async () => {

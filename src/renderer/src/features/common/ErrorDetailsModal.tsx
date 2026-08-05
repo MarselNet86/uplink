@@ -30,6 +30,12 @@ export function ErrorDetailsModal({
   if (!error) return null;
   const text = ERROR_TEXT[error.code];
   const report = reportOverride ?? buildErrorReport(error, context);
+  // A specific failure can override the generic per-code hint (BUG-17/
+  // BUG-21/BUG-22, e.g. "the server's disk is full" instead of a static
+  // "check the network" text that doesn't match what actually happened) -
+  // `AppError.hint` existed in the contract for exactly this, but nothing
+  // ever read it before.
+  const hint = error.hint ?? text.hint;
 
   return (
     <Modal
@@ -45,7 +51,7 @@ export function ErrorDetailsModal({
         </>
       }
     >
-      <span className="block">{text.hint}</span>
+      <span className="block">{hint}</span>
       <pre className="mono mt-4 max-h-64 overflow-auto text-xs" style={{ whiteSpace: 'pre-wrap' }}>
         {report}
       </pre>
