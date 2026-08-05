@@ -10,6 +10,16 @@ import { InstallerError } from './InstallerError';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * How long to wait after a first "active and bound" reading before trusting
+ * it (BUG-19). `systemctl is-active` on a `Type=simple` unit flips to
+ * `active` the moment the process forks, before it has had any chance to
+ * fail on a bad config - confirmed live: a Hysteria2 instance whose ACME
+ * challenge failed crashed 2.5s after start, squarely inside this window,
+ * while `waitForService` had already reported success.
+ */
+const SERVICE_CONFIRM_DELAY_MS = 3_000;
+
 function toStep(spec: StepSpec, run: () => Promise<void>): Step {
   return { id: spec.id, title: spec.title, weight: spec.weight, critical: true, run };
 }
@@ -184,16 +194,31 @@ export abstract class BaseInstaller {
   }): Promise<boolean> {
     const deadline = Date.now() + opts.maxWaitMs;
     for (;;) {
-      const active = await this.runner.run(`systemctl is-active ${opts.unit}`);
-      // `-tulnp` (both protocols): a single-protocol ss query omits the
-      // Netid column that parseListenPorts needs to classify rows.
-      const listening = await this.runner.run('ss -tulnp');
-      const entries = parseListenPorts(listening.stdout);
-      const bound = findListener(entries, opts.protocol, opts.port)?.process === opts.processName;
-      if (parseIsActive(active.stdout) === 'active' && bound) return true;
+      if (await this.isActiveAndBound(opts)) {
+        // First reading can catch the process mid-fork, before it has had a
+        // chance to crash (BUG-19) - re-check once more after a short delay
+        // before trusting it, instead of returning on the first "yes".
+        await sleep(Math.min(SERVICE_CONFIRM_DELAY_MS, Math.max(0, deadline - Date.now())));
+        if (await this.isActiveAndBound(opts)) return true;
+      }
       if (Date.now() >= deadline) return false;
       await sleep(opts.pollIntervalMs);
     }
+  }
+
+  private async isActiveAndBound(opts: {
+    unit: string;
+    protocol: 'tcp' | 'udp';
+    port: number;
+    processName: string;
+  }): Promise<boolean> {
+    const active = await this.runner.run(`systemctl is-active ${opts.unit}`);
+    // `-tulnp` (both protocols): a single-protocol ss query omits the
+    // Netid column that parseListenPorts needs to classify rows.
+    const listening = await this.runner.run('ss -tulnp');
+    const entries = parseListenPorts(listening.stdout);
+    const bound = findListener(entries, opts.protocol, opts.port)?.process === opts.processName;
+    return parseIsActive(active.stdout) === 'active' && bound;
   }
 
   /**

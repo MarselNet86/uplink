@@ -45,3 +45,20 @@ The client-side timer stays as a backstop (now armed for `timeoutMs +
 (`E_TIMEOUT`) callers already expected, so no caller-visible contract change.
 
 Files: `src/main/ssh/CommandRunner.ts`.
+
+## BUG-19 - Hysteria2 can report success on a service that already crashed (blocker)
+
+**Cause:** `waitForService()` returned `true` on the first poll where
+`systemctl is-active` said `active` and the port was bound. For a
+`Type=simple` unit, `is-active` flips to `active` the instant the process
+forks - before it has had any chance to fail. Live: a Hysteria2 instance
+whose ACME http-01 challenge failed (port 80 taken by something else)
+crashed 2.479s after start; the single check landed inside that window and
+the app showed `Done` with a link to a service that was already dead.
+
+**Fix:** `waitForService()` now re-checks (`is-active` + bound port) again
+after a short delay before trusting the first positive reading, and only
+returns success if both checks agree. Factored the check itself into
+`isActiveAndBound()` so the retry doesn't duplicate the polling logic.
+
+Files: `src/main/domain/installers/BaseInstaller.ts`.
