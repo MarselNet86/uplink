@@ -231,3 +231,29 @@ Files: `src/main/domain/ProtocolDetector.ts`,
 `src/main/domain/installers/Hysteria2Installer.ts`,
 `src/renderer/src/features/select/protocolCopy.ts`,
 `tests/unit/ProtocolDetector.test.ts`.
+
+## BUG-12 - session:close is never called from the renderer
+
+**Cause:** `window.uplink.closeSession()` existed in the preload bridge but
+nothing in the renderer ever called it. A session stayed alive - occupying
+a slot until its own 5-minute idle timeout - even after the user had
+navigated back to step 1 to enter different credentials.
+
+**Fix:** `App.tsx`'s "Back" handler now closes the current session before
+clearing `checkResult`, wrapped so a session that's already gone (idle
+timeout already fired) doesn't surface as an error.
+
+Files: `src/renderer/src/App.tsx`.
+
+## BUG-13 - no explanation for why only Manage is offered
+
+**Cause:** A protocol in `installed`/`broken`/`foreign` state showed only
+its state badge and a bare "Manage" button - no text explained what any of
+those states actually meant or why installing was blocked. `protocolMeta()`
+already existed with exactly this explanation (used only inside the Manage
+modal), it just wasn't rendered on the select-step card itself.
+
+**Fix:** The card's manageable branch now renders `protocolMeta()`'s text
+above the Manage button, same as the modal already does.
+
+Files: `src/renderer/src/features/select/SelectStep.tsx`.

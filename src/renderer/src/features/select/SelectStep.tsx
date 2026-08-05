@@ -5,7 +5,7 @@ import { Button } from '../../ui/Button';
 import { Checkbox } from '../../ui/Checkbox';
 import { Collapsible } from '../../ui/Collapsible';
 import { CopyButton } from '../../ui/CopyButton';
-import { PROTOCOL_PORT, PROTOCOL_TITLE } from './protocolCopy';
+import { PROTOCOL_PORT, PROTOCOL_TITLE, protocolMeta } from './protocolCopy';
 
 export interface SelectStepProps {
   result: CheckResult;
@@ -138,12 +138,18 @@ export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepPr
               )}
 
               {pick.manageable ? (
-                <div className="node-foot">
-                  {link ? <CopyButton value={link} /> : <span />}
-                  <Button variant="secondary" onClick={() => onManage(pick.protocol)}>
-                    Manage
-                  </Button>
-                </div>
+                <>
+                  {/* Why installing is blocked and only Manage is offered
+                      (BUG-13) - without this a foreign/broken protocol gave
+                      no explanation beyond the state badge above. */}
+                  <p className="node-meta">{protocolMeta(pick.protocol, state)}</p>
+                  <div className="node-foot">
+                    {link ? <CopyButton value={link} /> : <span />}
+                    <Button variant="secondary" onClick={() => onManage(pick.protocol)}>
+                      Manage
+                    </Button>
+                  </div>
+                </>
               ) : (
                 <>
                   <p className="node-meta">{PROTOCOL_DESC[pick.protocol]}</p>

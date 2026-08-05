@@ -113,6 +113,16 @@ export default function App() {
     }
   };
 
+  // Abandoning step 2's session (going back to re-enter credentials) is the
+  // one place nothing else already closes it - BUG-12: session:close was
+  // never called from the renderer at all, so a session sat alive until its
+  // own 5-minute idle timeout even after the user had already left it.
+  const handleBack = () => {
+    const sessionId = checkResult?.sessionId;
+    setCheckResult(null);
+    if (sessionId) void window.uplink.closeSession(sessionId).catch(() => {});
+  };
+
   const step = !checkResult ? 1 : !run ? 2 : !run.result ? 3 : 4;
 
   return (
@@ -125,7 +135,7 @@ export default function App() {
         {step === 2 && checkResult && (
           <SelectStep
             result={checkResult}
-            onBack={() => setCheckResult(null)}
+            onBack={handleBack}
             onManage={() => setManageOpen(true)}
             onInstall={(protocols) => void handleInstall(protocols)}
           />
