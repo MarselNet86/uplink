@@ -15,7 +15,11 @@ const HY2_SERVICE = 'hysteria-server.service';
 // gets a request that isn't the VPN protocol itself (tech.md 5.7): reuses
 // the same host as the self-signed cert's CN, nothing user-controlled ever
 // reaches this URL (tech.md 5.7's "not from user input").
-const MASQUERADE_URL = 'https://www.bing.com/';
+//
+// Exported so ProtocolDetector can grep for it as a "this config is ours"
+// fingerprint (BUG-11) - a config.yaml written by anything else is
+// vanishingly unlikely to point its masquerade proxy at this exact URL.
+export const MASQUERADE_URL = 'https://www.bing.com/';
 const INSTALL_RETRY_DELAYS_MS = [5_000, 15_000, 30_000];
 const INSTALL_TIMEOUT_MS = 600_000;
 const VERIFY_POLL_INTERVAL_MS = 5_000;

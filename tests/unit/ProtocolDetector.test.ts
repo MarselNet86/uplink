@@ -47,4 +47,14 @@ describe('ProtocolDetector', () => {
     const [xray] = await new ProtocolDetector(runner).detect();
     expect(xray).toEqual({ protocol: 'vless-reality', state: 'foreign', serviceActive: true });
   });
+
+  it('reports foreign when Hysteria2 config exists but was not written by this app (BUG-11)', async () => {
+    const runner = new FakeCommandRunner();
+    runner.setDefault({ code: 0 });
+    runner.script('systemctl is-active hysteria-server.service', { code: 3, stdout: 'inactive\n' });
+    runner.script(`grep -qF 'https://www.bing.com/' /etc/hysteria/config.yaml`, { code: 1 });
+
+    const [, hy2] = await new ProtocolDetector(runner).detect();
+    expect(hy2).toEqual({ protocol: 'hysteria2', state: 'foreign', serviceActive: false });
+  });
 });

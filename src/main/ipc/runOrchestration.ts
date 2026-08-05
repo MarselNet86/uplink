@@ -209,15 +209,33 @@ export function buildRunResult(
   if (pipelineResult.status === 'completed') {
     outcomes = units.map((u) => u.getOutcome());
   } else if (pipelineResult.status === 'cancelled') {
-    outcomes = units.map((u) =>
-      completedUnits.has(u)
-        ? u.getOutcome()
-        : {
-            protocol: u.protocolId,
-            ok: false,
-            error: { code: 'E_CANCELLED', message: 'Operation cancelled by user' },
+    // A unit already past its own start step when cancellation landed - a
+    // reinstall whose remover step is done, say - has changed the server's
+    // state and has no rollback of its own (tech.md 5.10: old installs are
+    // never restored). Saying only "cancelled" here is indistinguishable
+    // from a cancellation that changed nothing at all (BUG-10: confirmed
+    // live, a fully-removed protocol showed the exact same text as a no-op
+    // cancel), so it gets a message that says so explicitly.
+    const inFlightUnits = new Set(trackingSink.inFlightUnits);
+    outcomes = units.map((u) => {
+      if (completedUnits.has(u)) return u.getOutcome();
+      if (inFlightUnits.has(u)) {
+        return {
+          protocol: u.protocolId,
+          ok: false,
+          error: {
+            code: 'E_CANCELLED',
+            message:
+              'Cancelled after the previous state was already changed - check the protocol status before retrying',
           },
-    );
+        };
+      }
+      return {
+        protocol: u.protocolId,
+        ok: false,
+        error: { code: 'E_CANCELLED', message: 'Operation cancelled by user' },
+      };
+    });
   } else {
     diagnostics = redact(String(pipelineResult.error));
     outcomes = units.map((u) => {

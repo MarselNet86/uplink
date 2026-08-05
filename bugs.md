@@ -190,3 +190,44 @@ so the comparison is always IP-to-IP. Added a regression test for the
 hostname-connected case.
 
 Files: `src/main/domain/Preflight.ts`, `tests/unit/Preflight.test.ts`.
+
+## BUG-10 - cancelling mid-reinstall gives no warning that the old install is gone
+
+**Cause:** A reinstall's remover step runs before its installer steps
+(tech.md 5.10). Cancelling once the remover had already finished but before
+the new install completed showed the exact same "Cancelled / Operation
+cancelled by user" text as cancelling before anything happened at all -
+live: a fully-removed protocol and a genuine no-op looked identical to the
+user.
+
+**Fix:** `buildRunResult()`'s cancelled branch now checks whether the unit
+was already in-flight (its own start step reached `done`) when the
+cancellation landed - true only once the remover step of a reinstall has
+actually run - and gives it a distinct message: "Cancelled after the
+previous state was already changed - check the protocol status before
+retrying".
+
+Files: `src/main/ipc/runOrchestration.ts`, `tests/unit/runOrchestration.test.ts`.
+
+## BUG-11 - Hysteria2 has no foreign-config detection
+
+**Cause:** `ProtocolDetector` fingerprinted a foreign Xray install by
+grepping its config for the Reality stream, but had no equivalent check for
+Hysteria2 - any Hysteria2 binary+config combination was reported as
+`installed`/`broken`, never `foreign`, even one this app never wrote. Live:
+a fake binary and an unrelated config.yaml showed as "NOT RUNNING" (own,
+broken install) instead of a foreign config warning.
+
+**Fix:** Every config this app writes points its masquerade proxy at the
+same fixed URL (`Hysteria2Installer.MASQUERADE_URL`, now exported).
+`ProtocolDetector.detectHysteria2()` greps for it the same way Xray's
+detector greps for the Reality stream, and reports `foreign` when it's
+missing. Also fixed `protocolMeta()` in `protocolCopy.ts`, which had a
+single hardcoded "foreign Xray config" message shared across both
+protocols - a Hysteria2 foreign result would otherwise have shown a message
+about Xray/Reality.
+
+Files: `src/main/domain/ProtocolDetector.ts`,
+`src/main/domain/installers/Hysteria2Installer.ts`,
+`src/renderer/src/features/select/protocolCopy.ts`,
+`tests/unit/ProtocolDetector.test.ts`.

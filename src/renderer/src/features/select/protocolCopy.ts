@@ -18,10 +18,18 @@ const DEFAULT_META: Record<ProtocolId, string> = {
 const STATE_META: Partial<Record<ProtocolState, string>> = {
   installed: 'Found on the server, service is active.',
   broken: 'Found on the server, service is not running.',
-  foreign: 'Found a foreign Xray config without Reality.',
+};
+
+// Foreign-config wording is protocol-specific (BUG-11): a Hysteria2 config
+// not written by this app has nothing to do with Reality, so the shared
+// "no Reality" phrasing would be actively wrong for it.
+const FOREIGN_META: Record<ProtocolId, string> = {
+  'vless-reality': 'Found a foreign Xray config without Reality.',
+  hysteria2: 'Found a foreign Hysteria2 config, not managed by this app.',
 };
 
 export function protocolMeta(protocol: ProtocolId, state: ProtocolState): string {
+  if (state === 'foreign') return FOREIGN_META[protocol];
   return STATE_META[state] ?? DEFAULT_META[protocol];
 }
 

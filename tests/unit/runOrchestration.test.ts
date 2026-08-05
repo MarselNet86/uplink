@@ -194,6 +194,33 @@ describe('buildRunResult', () => {
     ]);
   });
 
+  it('cancelled: a unit that already started but not finished gets a distinct warning (BUG-10)', () => {
+    // Reinstall unit: remover's step is its startStepId, so seeing it
+    // reach 'done' means the old install was already torn down, even
+    // though the pipeline stopped before the new one finished.
+    const reinstall = unit({
+      protocolId: 'vless-reality',
+      startStepId: 'xray-remove',
+      finishStepId: 'xray-verify',
+    });
+    const sink = new RunTrackingSink(recordingSink(), [reinstall]);
+    sink.onStepStatus('xray-remove', 'done');
+
+    const result = buildRunResult('run-1', { status: 'cancelled' }, [reinstall], sink, [], []);
+
+    expect(result.outcomes).toEqual([
+      {
+        protocol: 'vless-reality',
+        ok: false,
+        error: {
+          code: 'E_CANCELLED',
+          message:
+            'Cancelled after the previous state was already changed - check the protocol status before retrying',
+        },
+      },
+    ]);
+  });
+
   it('failed: the owning unit gets the real error, others get the skipped message', () => {
     const failing = unit({
       protocolId: 'vless-reality',

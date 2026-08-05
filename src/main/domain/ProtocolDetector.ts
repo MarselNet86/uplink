@@ -1,5 +1,7 @@
 import type { ProtocolStatus } from '@shared/types';
+import { shellQuote } from '../security/shellQuote';
 import type { ICommandRunner } from '../ssh/types';
+import { MASQUERADE_URL } from './installers/Hysteria2Installer';
 import { parseIsActive } from './parsers/systemctl';
 
 /**
@@ -60,6 +62,20 @@ export class ProtocolDetector {
 
     if (!binaryPresent && !configPresent) {
       return { protocol: 'hysteria2', state: 'absent', serviceActive: false };
+    }
+
+    if (binaryPresent && configPresent) {
+      // Hysteria2 had no equivalent of Xray's reality-stream fingerprint
+      // (BUG-11): a foreign install (own binary/config, unrelated content)
+      // was indistinguishable from ours and reported as "broken" instead of
+      // "foreign". Every config this app writes points its masquerade proxy
+      // at the same fixed URL, so its absence marks the config as foreign.
+      const ours = await this.runner.run(
+        `grep -qF ${shellQuote(MASQUERADE_URL)} /etc/hysteria/config.yaml`,
+      );
+      if (ours.code !== 0) {
+        return { protocol: 'hysteria2', state: 'foreign', serviceActive };
+      }
     }
 
     return { protocol: 'hysteria2', state: serviceActive ? 'installed' : 'broken', serviceActive };
