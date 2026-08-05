@@ -98,7 +98,7 @@ export function ResultStep({ result, onDone }: ResultStepProps) {
         </Alert>
       )}
 
-      {(failed.length > 0 || result.diagnostics) && (
+      {(failed.length > 0 || result.diagnostics || result.warnings.length > 0) && (
         <Collapsible title="Diagnostics">
           <p className="field-hint" style={{ marginBottom: 'var(--s2)' }}>
             Copy and send this text if you need help with the error.

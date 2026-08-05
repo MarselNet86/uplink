@@ -257,3 +257,18 @@ modal), it just wasn't rendered on the select-step card itself.
 above the Manage button, same as the modal already does.
 
 Files: `src/renderer/src/features/select/SelectStep.tsx`.
+
+## BUG-16 - warnings from a fully successful run are never shown
+
+**Cause:** The "Diagnostics" collapsible - the only place `RunResult.warnings`
+is rendered (via `buildDiagnosticsReport()`) - only opened when
+`failed.length > 0 || result.diagnostics`. Both are false on a run where
+every protocol succeeded, so a warning like "ufw is installed but not
+active" (confirmed live) was silently dropped even though the app had
+already recorded it correctly.
+
+**Fix:** Added `|| result.warnings.length > 0` to the collapsible's render
+condition. `buildDiagnosticsReport()` already included the warnings section
+unconditionally, so no further change was needed.
+
+Files: `src/renderer/src/features/result/ResultStep.tsx`.
