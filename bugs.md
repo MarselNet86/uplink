@@ -344,6 +344,7 @@ ssh:check» - но `CheckResult.preflight.passed` никто и нигде не 
 сидели как информационные `CheckItem`.
 
 **Исправление:**
+
 - `preflightStep` в `installStart.ts` теперь заново прогоняет `Preflight`
   по текущему состоянию сервера (оно может измениться между `ssh:check` и
   нажатием Install) и бросает смапленный `ErrorCode` для первой
