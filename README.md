@@ -1,5 +1,4 @@
-<img src="docs/readme/kurai.png" width="120" align="left" alt="Kurai - the emblem of Bashkortostan">
-<img src="docs/readme/kurai.png" width="120" align="right" alt="Kurai - the emblem of Bashkortostan">
+<img src="docs/readme/kurai.png" width="120" align="left" alt="Kurai - the emblem of Bashkortostan"><img src="docs/readme/kurai.png" width="120" align="right" alt="Kurai - the emblem of Bashkortostan">
 
 <p align="center">
   <b>Башҡортостанда эшләнгән.</b><br>
