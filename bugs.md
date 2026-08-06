@@ -1,399 +1,422 @@
-# Bug fixes
+# Исправления багов
 
-Log of fixes applied for the defects catalogued in `spec.md` section 11
-(BUG-01…BUG-23). One entry per bug: what was wrong, why, and the fix. Kept
-short and factual; see `spec.md` for the original live/reasoned findings and
-`tech.md` for the contract these fixes have to stay inside.
+Журнал исправлений дефектов, каталогизированных в разделе 11 `spec.md`
+(BUG-01…BUG-23). Одна запись на баг: в чём была причина и как исправлено.
+Кратко и по существу; исходные живые/логические находки — в `spec.md`,
+контракт, в рамках которого сделаны эти исправления — в `tech.md`.
 
-## BUG-01 - idle timeout fires mid-install (blocker)
+## BUG-01 - idle-таймаут срабатывает посреди установки (блокер)
 
-**Cause:** `SshSession`'s 5-minute idle timer was armed once, at
-`getCommandRunner()`/`getFileTransfer()` acquisition time, not on actual use.
-An installer gets the runner exactly once and holds onto it for the whole
-run, so any run - or single slow command - taking longer than 5 minutes was
-disconnected out from under itself regardless of whether the connection was
-genuinely idle. A secondary bug in the same area (E-06): the idle timer
-called `session.dispose()` directly instead of going through
-`sessionRegistry.disposeSession()`, so the registry kept a dead session
-reachable by `getSession()` after the timeout fired.
+**Причина:** 5-минутный idle-таймер `SshSession` заводился один раз, в
+момент получения раннера (`getCommandRunner()`/`getFileTransfer()`), а не
+при реальном использовании. Инсталлер получает раннер ровно один раз и
+держит его весь прогон, поэтому любой прогон - или одна медленная команда -
+длиннее 5 минут обрывался сам по себе независимо от того, была ли связь
+реально простаивающей. Смежный баг там же (E-06): idle-таймер вызывал
+`session.dispose()` напрямую, а не через `sessionRegistry.disposeSession()`,
+из-за чего в реестре оставалась мёртвая сессия, всё ещё доступная через
+`getSession()` после срабатывания таймаута.
 
-**Fix:** `CommandRunner` and `FileTransfer` now take an `onActivity`
-callback, invoked at the start of every `exec()`/`writeFile()`, which rearms
-the session's idle timer. The timer now measures actual silence between
-commands, not wall-clock time since session creation. Added
-`SshSession.onIdleTimeout()` so `sessionRegistry.registerSession()` can drop
-its Map entry when the timer fires, closing the zombie-entry gap.
+**Исправление:** `CommandRunner` и `FileTransfer` теперь принимают колбэк
+`onActivity`, вызываемый в начале каждого `exec()`/`writeFile()` и
+перезаводящий idle-таймер сессии. Таймер теперь измеряет реальное молчание
+между командами, а не время с момента создания сессии. Добавлен
+`SshSession.onIdleTimeout()`, чтобы `sessionRegistry.registerSession()` мог
+удалить свою запись из Map при срабатывании таймера - закрывает дыру с
+«зомби»-записью.
 
-Files: `src/main/ssh/SshSession.ts`, `src/main/ssh/sessionRegistry.ts`,
+Файлы: `src/main/ssh/SshSession.ts`, `src/main/ssh/sessionRegistry.ts`,
 `src/main/ssh/CommandRunner.ts`, `src/main/ssh/FileTransfer.ts`.
 
-## BUG-18 - timed-out command keeps running on the server
+## BUG-18 - команда, упавшая по таймауту, продолжает работать на сервере
 
-**Cause:** `CommandRunner`'s per-command timeout called `stream.close()`,
-which only tears down the client's view of the SSH channel. The remote
-process (e.g. `apt-get update`, a `curl` download) was never signalled and
-kept running to completion on the server, orphaned and unseen by the app -
-confirmed live three times, including a fully-downloaded but never-installed
-Xray archive left behind in `/tmp`.
+**Причина:** Таймаут на команду в `CommandRunner` вызывал `stream.close()`,
+а это закрывает только клиентское представление SSH-канала. Удалённый
+процесс (например, `apt-get update`, скачивание через `curl`) никак не
+уведомлялся и продолжал выполняться до конца на сервере, осиротевший и
+невидимый приложению - подтверждено вживую трижды, включая полностью
+докачанный, но так и не установленный архив Xray, оставшийся в `/tmp`.
 
-**Fix:** every command now runs wrapped in the remote `timeout -k 10 <n>s`,
-so the server itself kills the process tree (SIGTERM, then SIGKILL after a
-10s grace) when the budget elapses, independent of the SSH channel's state.
-The client-side timer stays as a backstop (now armed for `timeoutMs +
-15_000`) for the case where the channel itself never reports back at all.
-`timeout`'s exit code 124 is mapped to the same `CommandRunnerError`
-(`E_TIMEOUT`) callers already expected, so no caller-visible contract change.
+**Исправление:** теперь каждая команда выполняется обёрнутой в удалённый
+`timeout -k 10 <n>s`, так что сам сервер убивает дерево процессов (SIGTERM,
+затем SIGKILL спустя 10с) по истечении бюджета - независимо от состояния
+SSH-канала. Клиентский таймер остаётся подстраховкой (теперь заводится на
+`timeoutMs + 15_000`) на случай, если канал вообще не отвечает. Код выхода
+124 у `timeout` мапится в тот же `CommandRunnerError` (`E_TIMEOUT`), что
+вызывающий код и так ожидал - контракт для вызывающей стороны не меняется.
 
-Files: `src/main/ssh/CommandRunner.ts`.
+Файлы: `src/main/ssh/CommandRunner.ts`.
 
-## BUG-19 - Hysteria2 can report success on a service that already crashed (blocker)
+## BUG-19 - Hysteria2 может отрапортовать успехом при уже упавшем сервисе (блокер)
 
-**Cause:** `waitForService()` returned `true` on the first poll where
-`systemctl is-active` said `active` and the port was bound. For a
-`Type=simple` unit, `is-active` flips to `active` the instant the process
-forks - before it has had any chance to fail. Live: a Hysteria2 instance
-whose ACME http-01 challenge failed (port 80 taken by something else)
-crashed 2.479s after start; the single check landed inside that window and
-the app showed `Done` with a link to a service that was already dead.
+**Причина:** `waitForService()` возвращал `true` уже на первом опросе, где
+`systemctl is-active` говорил `active`, а порт был занят. Для юнита
+`Type=simple` `is-active` переходит в `active` в момент форка процесса - до
+того, как у него вообще была возможность упасть. Вживую: инстанс Hysteria2,
+у которого не прошёл ACME http-01 challenge (порт 80 был занят другим
+процессом), упал через 2.479с после старта; единственная проверка попала
+ровно в это окно, и приложение показало `Done` со ссылкой на уже мёртвый
+сервис.
 
-**Fix:** `waitForService()` now re-checks (`is-active` + bound port) again
-after a short delay before trusting the first positive reading, and only
-returns success if both checks agree. Factored the check itself into
-`isActiveAndBound()` so the retry doesn't duplicate the polling logic.
+**Исправление:** `waitForService()` теперь повторно проверяет (`is-active` +
+занятый порт) ещё раз после небольшой задержки, прежде чем доверять первому
+положительному результату, и возвращает успех только если обе проверки
+совпали. Сама проверка вынесена в `isActiveAndBound()`, чтобы повтор не
+дублировал логику опроса.
 
-Files: `src/main/domain/installers/BaseInstaller.ts`.
+Файлы: `src/main/domain/installers/BaseInstaller.ts`.
 
-## BUG-04 - apt-get timeout too short for its own budget
+## BUG-04 - таймаут apt-get слишком мал для собственного бюджета
 
-**Cause:** `apt-get update`/`install` ran with `CommandRunner`'s 60s default
-timeout, while the core-download step right after it gets 600s. Live: a
-budget VPS with several apt mirrors configured took 3-4 minutes for
-`apt-get update` alone with no throttling involved - the 60s budget failed
-this step long before there was anything actually wrong.
+**Причина:** `apt-get update`/`install` выполнялись с дефолтным таймаутом
+`CommandRunner` в 60с, тогда как следующему за ним шагу скачивания ядра
+выделено 600с. Вживую: бюджетный VPS с несколькими настроенными
+apt-зеркалами занял 3-4 минуты на один только `apt-get update` без всякого
+троттлинга - бюджет в 60с проваливал этот шаг задолго до того, как
+действительно что-то было не так.
 
-**Fix:** `installAptPackages()` now passes an explicit 300s timeout for both
-commands.
+**Исправление:** `installAptPackages()` теперь передаёт явный таймаут 300с
+для обеих команд.
 
-Files: `src/main/domain/installers/BaseInstaller.ts`.
+Файлы: `src/main/domain/installers/BaseInstaller.ts`.
 
-## BUG-05 - a bad Reality donor leaves an installed-but-unconfigured Xray core behind
+## BUG-05 - неудачный донор Reality оставляет установленное, но не настроенное ядро Xray
 
-**Cause:** Donor selection (X4) runs in `generateSecrets()`, after
-`installCore()`, because the check itself shells out to `xray tls ping` -
-it needs the binary to exist. A failing donor check therefore always left
-Xray installed on the server with no config and no running service.
+**Причина:** Выбор донора (X4) выполняется в `generateSecrets()`, после
+`installCore()`, потому что сама проверка обращается к `xray tls ping` - ей
+нужен установленный бинарь. Поэтому неудачная проверка донора всегда
+оставляла Xray установленным на сервере без конфига и без запущенного
+сервиса.
 
-**Fix:** Reordering the check itself isn't possible without replacing `xray
-tls ping` with a hand-rolled TLS probe (out of scope, and a contract change
-per tech.md 5.6 X4). Instead, `generateSecrets()` now catches a donor-check
-failure and removes the just-installed, still-unconfigured core
-(`systemctl disable --now xray`, delete the binary and `/usr/local/etc/xray`)
-before re-throwing the original error - best-effort, and never masks the
-real `E_NO_REALITY_DONOR`.
+**Исправление:** Переставить саму проверку раньше нельзя без замены `xray
+tls ping` на самописный TLS-пробник (вне рамок задачи, к тому же изменение
+контракта по tech.md 5.6 X4). Вместо этого `generateSecrets()` теперь ловит
+ошибку выбора донора и удаляет только что установленное, ещё не
+настроенное ядро (`systemctl disable --now xray`, удаление бинаря и
+`/usr/local/etc/xray`) перед повторным выбросом исходной ошибки -
+best-effort, и никогда не маскирует настоящую `E_NO_REALITY_DONOR`.
 
-Files: `src/main/domain/installers/XrayRealityInstaller.ts`.
+Файлы: `src/main/domain/installers/XrayRealityInstaller.ts`.
 
-## BUG-14 - 15s service-verify wait too short
+## BUG-14 - слишком короткое ожидание проверки сервиса в 15с
 
-**Cause:** Both `XrayRealityInstaller` and `Hysteria2Installer`'s
-self-signed branch gave `waitForService()` only 15s to see the unit become
-active and bound. On a loaded or slow server the daemon can take longer
-than that to bind its socket, which would fail a perfectly good install
-with `E_SERVICE_FAILED`.
+**Причина:** И у `XrayRealityInstaller`, и у self-signed-ветки
+`Hysteria2Installer` на то, чтобы `waitForService()` увидел юнит активным и
+занявшим порт, было всего 15с. На нагруженном или медленном сервере демону
+может понадобиться больше времени, чтобы забиндить сокет, из-за чего
+абсолютно корректная установка проваливалась с `E_SERVICE_FAILED`.
 
-**Fix:** Raised `SERVICE_START_MAX_WAIT_MS` to 30s in both installers.
+**Исправление:** `SERVICE_START_MAX_WAIT_MS` поднят до 30с в обоих
+инсталлерах.
 
-Files: `src/main/domain/installers/XrayRealityInstaller.ts`,
+Файлы: `src/main/domain/installers/XrayRealityInstaller.ts`,
 `src/main/domain/installers/Hysteria2Installer.ts`.
 
-## BUG-15 (and BUG-06) - SSH-level failures collapse into E_UNKNOWN
+## BUG-15 (и BUG-06) - ошибки уровня SSH схлопываются в E_UNKNOWN
 
-**Cause:** Every ssh2-level failure without an exact `err.level`/`err.code`
-match fell through to `E_UNKNOWN`/"Unknown error" - confirmed live four
-separate ways: a slow trust-dialog decision ("Timed out while waiting for
-handshake"), a silently unreachable host (same message), a plain wrong port
-("Connection lost before handshake"), and a transient channel failure
-("Channel open failure: open failed"). The same gap applies to a connection
-dropped mid-install after the session was already established (BUG-06,
-blocked from live confirmation by the tester's VPN, but the same missing
-classification either way): `BaseInstaller`/`BaseRemover.toAppError()` had
-no fallback beyond `instanceof InstallerError`/`CommandRunnerError`.
+**Причина:** Любая ошибка уровня ssh2 без точного совпадения по
+`err.level`/`err.code` проваливалась в `E_UNKNOWN`/«Unknown error» -
+подтверждено вживую четырьмя разными путями: медленное решение в диалоге
+доверия («Timed out while waiting for handshake»), тихо недоступный хост
+(то же сообщение), обычный неверный порт («Connection lost before
+handshake») и транзиентный сбой канала («Channel open failure: open
+failed»). Та же дыра касается и разрыва соединения посреди установки уже
+после того, как сессия была установлена (BUG-06, живое подтверждение
+заблокировано VPN тестировщика, но пробел в классификации тот же):
+`BaseInstaller`/`BaseRemover.toAppError()` не имели никакого фолбэка, кроме
+`instanceof InstallerError`/`CommandRunnerError`.
 
-**Fix:** New `classifySshError()` (`src/main/ssh/classifySshError.ts`)
-matches the exact wording confirmed live - timeout-shaped messages become
-`E_TIMEOUT`, connection-drop-shaped messages become `E_NET_UNREACHABLE` -
-and falls back to `E_UNKNOWN` only when nothing matches, never inventing a
-code it isn't reasonably sure of. Wired into `mapConnectError()` (connect
-time), `BaseInstaller`/`BaseRemover.toAppError()` (mid-run), and
-`sshCheck.ts`'s preflight catch block, so the same class of raw ssh2 error
-gets the same treatment everywhere it can surface. Also added the
-`client-timeout` level explicitly to `mapConnectError()`.
+**Исправление:** новая `classifySshError()`
+(`src/main/ssh/classifySshError.ts`) сопоставляет с точным текстом,
+подтверждённым вживую - сообщения в духе таймаута превращаются в
+`E_TIMEOUT`, сообщения в духе разрыва соединения - в `E_NET_UNREACHABLE` - и
+откатывается на `E_UNKNOWN` только когда ничего не подошло, никогда не
+выдумывая код, в котором нет достаточной уверенности. Подключена в
+`mapConnectError()` (момент подключения), `BaseInstaller`/
+`BaseRemover.toAppError()` (посреди прогона) и в catch-блок preflight в
+`sshCheck.ts`, так что один и тот же класс сырых ошибок ssh2 везде получает
+одинаковую обработку. Также в `mapConnectError()` явно добавлен уровень
+`client-timeout`.
 
-Files: `src/main/ssh/classifySshError.ts` (new), `src/main/ssh/SshSession.ts`,
-`src/main/domain/installers/BaseInstaller.ts`,
+Файлы: `src/main/ssh/classifySshError.ts` (новый),
+`src/main/ssh/SshSession.ts`, `src/main/domain/installers/BaseInstaller.ts`,
 `src/main/domain/removers/BaseRemover.ts`, `src/main/ipc/handlers/sshCheck.ts`.
 
-## BUG-20 - declining to trust a new server looks like a real mismatch
+## BUG-20 - отказ довериться новому серверу выглядит как настоящая подмена
 
-**Cause:** `resolveHostKeyDecision()` returned a plain boolean, `false` for
-both "this is a brand-new server and the user declined to trust it" and
-"the stored fingerprint no longer matches" (an actual, dangerous mismatch).
-`mapConnectError()` only saw that boolean, so declining a first-time
-connection showed the exact same "fingerprint has changed / possible
-MITM/OS reinstall" alarm as a genuine hijack - confirmed live.
+**Причина:** `resolveHostKeyDecision()` возвращал обычный boolean, `false`
+одинаково и для «это совершенно новый сервер, и пользователь отказался ему
+довериться», и для «сохранённый отпечаток больше не совпадает» (настоящая,
+опасная подмена). `mapConnectError()` видел только этот boolean, поэтому
+отказ от первого подключения показывал ту же самую тревогу «отпечаток
+сервера изменился / возможен MITM/переустановка ОС», что и настоящий
+перехват - подтверждено вживую.
 
-**Fix:** `resolveHostKeyDecision()` now returns a three-way
-`'accepted' | 'declined-new' | 'mismatch'` instead of a boolean.
-`mapConnectError()` maps `'mismatch'` to the existing
-`E_SSH_HOSTKEY_MISMATCH` alarm, unchanged, and `'declined-new'` to
-`E_CANCELLED` ("Server fingerprint was not trusted") - an existing contract
-code that already fits the "user chose not to proceed" case exactly, no
-contract change needed.
+**Исправление:** `resolveHostKeyDecision()` теперь возвращает одно из трёх
+значений `'accepted' | 'declined-new' | 'mismatch'` вместо boolean.
+`mapConnectError()` мапит `'mismatch'` в прежнюю тревогу
+`E_SSH_HOSTKEY_MISMATCH` без изменений, а `'declined-new'` - в `E_CANCELLED`
+(«Server fingerprint was not trusted») - уже существующий код контракта,
+который точно подходит для случая «пользователь решил не продолжать»,
+изменение контракта не потребовалось.
 
-Files: `src/main/ssh/SshSession.ts`.
+Файлы: `src/main/ssh/SshSession.ts`.
 
-## BUG-07 (and BUG-08) - self-signed is unreachable from the UI
+## BUG-07 (и BUG-08) - self-signed недостижим из интерфейса
 
-**Cause:** `tech.md` section 4 specifies self-signed as the actual default:
-Hysteria2 should only switch to `acme-domain` when the user explicitly
-checks "use my own domain". `ConnectForm.submit()` instead always computed
-`domain` from `deriveAutoDomain(values.host)` regardless of the checkbox,
-which returns a non-empty `<ip>.sslip.io` for every IPv4 host - so
-`acme-domain` (and the sslip.io/Let's Encrypt dependency, and its weekly
-issuance limit) was selected for essentially every real install, and the
-checkbox's own unchecked state was silently ignored. This is also BUG-08's
-root cause (the same forced ACME path burns the rate limit on ordinary use).
+**Причина:** Раздел 4 `tech.md` устанавливает self-signed как фактический
+дефолт: Hysteria2 должен переключаться на `acme-domain` только когда
+пользователь явно отмечает «использовать свой домен». Вместо этого
+`ConnectForm.submit()` всегда вычислял `domain` через
+`deriveAutoDomain(values.host)` независимо от чекбокса, а эта функция
+возвращает непустой `<ip>.sslip.io` для любого IPv4-хоста - поэтому
+`acme-domain` (а вместе с ним зависимость от sslip.io/Let's Encrypt и
+недельный лимит выпуска) выбирался практически при любой реальной
+установке, а собственное невключённое состояние чекбокса молча
+игнорировалось. Это же и корневая причина BUG-08 (тот же принудительный
+ACME-путь тратит лимит при обычном использовании).
 
-**Fix:** `domain`/`acmeEmail` are now only ever taken from the form's own
-fields, and only when `domainOverride` is true - matching tech.md's
-described behavior exactly. Rewrote the collapsible's copy to describe the
-real default (self-signed, no domain) instead of a domain that was said to
-be used automatically. Removed the now-unused sslip.io auto-fill path from
-the component; `deriveAutoDomain`/`deriveAutoAcmeEmail` stay in
-`formValidation.ts` as tested pure functions, just no longer invoked from
-the form.
+**Исправление:** `domain`/`acmeEmail` теперь берутся исключительно из
+собственных полей формы, и только когда `domainOverride` включён - точно
+соответствует описанному в tech.md поведению. Переписан текст в
+сворачиваемом блоке, чтобы описывать реальный дефолт (self-signed, без
+домена) вместо домена, который якобы использовался автоматически. Из
+компонента убран ставший ненужным путь автозаполнения sslip.io;
+`deriveAutoDomain`/`deriveAutoAcmeEmail` остаются в `formValidation.ts` как
+покрытые тестами чистые функции, просто больше не вызываются из формы.
 
-Files: `src/renderer/src/features/connect/ConnectForm.tsx`.
+Файлы: `src/renderer/src/features/connect/ConnectForm.tsx`.
 
-## BUG-09 - DNS check compares a hostname against itself
+## BUG-09 - проверка DNS сравнивает имя хоста само с собой
 
-**Cause:** `checkDns()` resolved the domain via `getent hosts` and compared
-the result to `connectedHost` directly - correct when the user connects by
-IP, but when they connect by hostname (e.g. a sslip.io name) the check
-compared that hostname string to itself and always failed, even when the
-domain's A record was genuinely correct. Live: `31.207.77.243.sslip.io's A
-record does not point to 31.207.77.243.sslip.io`.
+**Причина:** `checkDns()` резолвил домен через `getent hosts` и сравнивал
+результат напрямую с `connectedHost` - это верно, когда пользователь
+подключается по IP, но когда подключение идёт по имени хоста (например,
+имя sslip.io), проверка сравнивала эту строку саму с собой и всегда
+проваливалась, даже если A-запись домена была абсолютно верной. Вживую:
+«31.207.77.243.sslip.io's A record does not point to
+31.207.77.243.sslip.io».
 
-**Fix:** `connectedHost` is now resolved the same way the domain is
-(`getent hosts`) whenever it isn't already an IP (`node:net`'s `isIP()`),
-so the comparison is always IP-to-IP. Added a regression test for the
-hostname-connected case.
+**Исправление:** `connectedHost` теперь резолвится тем же способом, что и
+домен (`getent hosts`), всякий раз когда он ещё не является IP (`isIP()` из
+`node:net`), так что сравнение всегда идёт IP-к-IP. Добавлен регрессионный
+тест на случай подключения по имени хоста.
 
-Files: `src/main/domain/Preflight.ts`, `tests/unit/Preflight.test.ts`.
+Файлы: `src/main/domain/Preflight.ts`, `tests/unit/Preflight.test.ts`.
 
-## BUG-10 - cancelling mid-reinstall gives no warning that the old install is gone
+## BUG-10 - отмена посреди переустановки не предупреждает, что старая установка уже снесена
 
-**Cause:** A reinstall's remover step runs before its installer steps
-(tech.md 5.10). Cancelling once the remover had already finished but before
-the new install completed showed the exact same "Cancelled / Operation
-cancelled by user" text as cancelling before anything happened at all -
-live: a fully-removed protocol and a genuine no-op looked identical to the
-user.
+**Причина:** Шаг удаления при переустановке выполняется раньше шагов
+установки (tech.md 5.10). Отмена уже после того, как удаление завершилось,
+но до завершения новой установки, показывала точно тот же текст
+«Cancelled / Operation cancelled by user», что и отмена до того, как вообще
+что-либо произошло - вживую полностью снесённый протокол и настоящий no-op
+выглядели для пользователя одинаково.
 
-**Fix:** `buildRunResult()`'s cancelled branch now checks whether the unit
-was already in-flight (its own start step reached `done`) when the
-cancellation landed - true only once the remover step of a reinstall has
-actually run - and gives it a distinct message: "Cancelled after the
-previous state was already changed - check the protocol status before
-retrying".
+**Исправление:** ветка отмены в `buildRunResult()` теперь проверяет, был ли
+юнит уже «в полёте» (его собственный стартовый шаг дошёл до `done`) в
+момент отмены - это верно только если шаг удаления при переустановке уже
+реально выполнился - и выдаёт для этого случая отдельное сообщение:
+«Cancelled after the previous state was already changed - check the
+protocol status before retrying».
 
-Files: `src/main/ipc/runOrchestration.ts`, `tests/unit/runOrchestration.test.ts`.
+Файлы: `src/main/ipc/runOrchestration.ts`, `tests/unit/runOrchestration.test.ts`.
 
-## BUG-11 - Hysteria2 has no foreign-config detection
+## BUG-11 - у Hysteria2 нет детекта чужого конфига
 
-**Cause:** `ProtocolDetector` fingerprinted a foreign Xray install by
-grepping its config for the Reality stream, but had no equivalent check for
-Hysteria2 - any Hysteria2 binary+config combination was reported as
-`installed`/`broken`, never `foreign`, even one this app never wrote. Live:
-a fake binary and an unrelated config.yaml showed as "NOT RUNNING" (own,
-broken install) instead of a foreign config warning.
+**Причина:** `ProtocolDetector` опознавал чужую установку Xray через grep
+конфига на предмет reality-потока, но эквивалентной проверки для Hysteria2
+не было - любая комбинация бинаря и конфига Hysteria2 репортилась как
+`installed`/`broken`, никогда как `foreign`, даже если это приложение её
+вообще не писало. Вживую: фиктивный бинарь и посторонний config.yaml
+показались как «NOT RUNNING» (своя, но сломанная установка) вместо
+предупреждения о чужом конфиге.
 
-**Fix:** Every config this app writes points its masquerade proxy at the
-same fixed URL (`Hysteria2Installer.MASQUERADE_URL`, now exported).
-`ProtocolDetector.detectHysteria2()` greps for it the same way Xray's
-detector greps for the Reality stream, and reports `foreign` when it's
-missing. Also fixed `protocolMeta()` in `protocolCopy.ts`, which had a
-single hardcoded "foreign Xray config" message shared across both
-protocols - a Hysteria2 foreign result would otherwise have shown a message
-about Xray/Reality.
+**Исправление:** каждый конфиг, который пишет это приложение, указывает
+свой masquerade-прокси на один и тот же фиксированный URL
+(`Hysteria2Installer.MASQUERADE_URL`, теперь экспортируется).
+`ProtocolDetector.detectHysteria2()` ищет его тем же grep'ом, каким детектор
+Xray ищет reality-поток, и репортит `foreign`, если он отсутствует. Заодно
+исправлен `protocolMeta()` в `protocolCopy.ts`, где было одно захардкоженное
+сообщение «foreign Xray config» на оба протокола - для Hysteria2 при
+состоянии foreign иначе показалось бы сообщение про Xray/Reality.
 
-Files: `src/main/domain/ProtocolDetector.ts`,
+Файлы: `src/main/domain/ProtocolDetector.ts`,
 `src/main/domain/installers/Hysteria2Installer.ts`,
 `src/renderer/src/features/select/protocolCopy.ts`,
 `tests/unit/ProtocolDetector.test.ts`.
 
-## BUG-12 - session:close is never called from the renderer
+## BUG-12 - session:close никогда не вызывается из renderer
 
-**Cause:** `window.uplink.closeSession()` existed in the preload bridge but
-nothing in the renderer ever called it. A session stayed alive - occupying
-a slot until its own 5-minute idle timeout - even after the user had
-navigated back to step 1 to enter different credentials.
+**Причина:** `window.uplink.closeSession()` существовал в preload-мосте, но
+ничто в renderer его не вызывало. Сессия оставалась живой - занимая слот
+до собственного 5-минутного idle-таймаута - даже после того, как
+пользователь вернулся на шаг 1, чтобы ввести другие учётные данные.
 
-**Fix:** `App.tsx`'s "Back" handler now closes the current session before
-clearing `checkResult`, wrapped so a session that's already gone (idle
-timeout already fired) doesn't surface as an error.
+**Исправление:** обработчик «Back» в `App.tsx` теперь закрывает текущую
+сессию перед очисткой `checkResult`, обёрнуто так, чтобы уже пропавшая
+сессия (idle-таймаут уже сработал) не всплывала как ошибка.
 
-Files: `src/renderer/src/App.tsx`.
+Файлы: `src/renderer/src/App.tsx`.
 
-## BUG-13 - no explanation for why only Manage is offered
+## BUG-13 - нет объяснения, почему доступен только Manage
 
-**Cause:** A protocol in `installed`/`broken`/`foreign` state showed only
-its state badge and a bare "Manage" button - no text explained what any of
-those states actually meant or why installing was blocked. `protocolMeta()`
-already existed with exactly this explanation (used only inside the Manage
-modal), it just wasn't rendered on the select-step card itself.
+**Причина:** Протокол в состоянии `installed`/`broken`/`foreign` показывал
+только бейдж статуса и голую кнопку «Manage» - никакой текст не объяснял,
+что эти состояния на самом деле значат и почему установка заблокирована.
+`protocolMeta()` с точно таким объяснением уже существовал (использовался
+только внутри модалки Manage), просто не выводился на самой карточке шага
+выбора.
 
-**Fix:** The card's manageable branch now renders `protocolMeta()`'s text
-above the Manage button, same as the modal already does.
+**Исправление:** ветка карточки для управляемых состояний теперь выводит
+текст `protocolMeta()` над кнопкой Manage - так же, как это уже делает
+модалка.
 
-Files: `src/renderer/src/features/select/SelectStep.tsx`.
+Файлы: `src/renderer/src/features/select/SelectStep.tsx`.
 
-## BUG-16 - warnings from a fully successful run are never shown
+## BUG-16 - предупреждения полностью успешного прогона никогда не показываются
 
-**Cause:** The "Diagnostics" collapsible - the only place `RunResult.warnings`
-is rendered (via `buildDiagnosticsReport()`) - only opened when
-`failed.length > 0 || result.diagnostics`. Both are false on a run where
-every protocol succeeded, so a warning like "ufw is installed but not
-active" (confirmed live) was silently dropped even though the app had
-already recorded it correctly.
+**Причина:** Сворачиваемый блок «Diagnostics» - единственное место, где
+рендерится `RunResult.warnings` (через `buildDiagnosticsReport()`) -
+открывался только при `failed.length > 0 || result.diagnostics`. На
+прогоне, где все протоколы успешны, оба условия ложны, поэтому
+предупреждение вроде «ufw is installed but not active» (подтверждено
+вживую) молча терялось, хотя приложение его совершенно верно записало.
 
-**Fix:** Added `|| result.warnings.length > 0` to the collapsible's render
-condition. `buildDiagnosticsReport()` already included the warnings section
-unconditionally, so no further change was needed.
+**Исправление:** в условие рендера блока добавлено
+`|| result.warnings.length > 0`. `buildDiagnosticsReport()` уже безусловно
+включал секцию предупреждений, дополнительных изменений не потребовалось.
 
-Files: `src/renderer/src/features/result/ResultStep.tsx`.
+Файлы: `src/renderer/src/features/result/ResultStep.tsx`.
 
-## BUG-17/BUG-22 - E_NO_REALITY_DONOR hint always blames the built-in list
+## BUG-17/BUG-22 - подсказка E_NO_REALITY_DONOR всегда винит встроенный список
 
-**Cause:** `ERROR_TEXT['E_NO_REALITY_DONOR'].hint` is a single static string
-("None of the built-in candidates passed the check") shown regardless of
-whether the built-in list was actually checked, or a user-supplied SNI
-replaced it entirely and was the only thing checked. The correct
-distinction already existed in `InstallerError.message` (diagnostics-only,
-not shown as the primary hint) - `AppError.hint` was defined in the
-contract for exactly this and was never populated by anyone, nor ever read
-by the UI.
+**Причина:** `ERROR_TEXT['E_NO_REALITY_DONOR'].hint` - единая статичная
+строка («None of the built-in candidates passed the check»), показываемая
+независимо от того, проверялся ли на самом деле встроенный список, или его
+целиком заменил пользовательский SNI, и проверялся только он. Верное
+различие уже существовало в `InstallerError.message` (только в
+диагностике, не показывается как основная подсказка) - `AppError.hint` был
+заведён в контракте именно для этого случая, но никто никогда его не
+заполнял, да и UI его никогда не читал.
 
-**Fix:** `ErrorDetailsModal` now shows `error.hint` when the failure
-provided one, falling back to the static `ERROR_TEXT` hint otherwise.
-`XrayRealityInstaller.selectDonor()` now passes a donor-specific hint when
-`params.realitySni` was set, naming the actual domain that failed instead
-of blaming a list that was never consulted.
+**Исправление:** `ErrorDetailsModal` теперь показывает `error.hint`, если
+он передан ошибкой, иначе откатывается на статичную подсказку из
+`ERROR_TEXT`. `XrayRealityInstaller.selectDonor()` теперь передаёт
+специфичную для донора подсказку, если был задан `params.realitySni`,
+называя реальный домен, который не прошёл проверку, вместо обвинения
+списка, который вообще не проверялся.
 
-## BUG-21 - E_DOWNLOAD_FAILED hint always blames the network
+## BUG-21 - подсказка E_DOWNLOAD_FAILED всегда винит сеть
 
-**Cause:** Same static-hint gap as BUG-17/22, different code: `installCore()`
-in both installers threw `E_DOWNLOAD_FAILED` on any non-zero exit from the
-install script's retries, and the UI hint is hardcoded to "check the
-server's network connection" - live: a full disk (`No space left on
-device`) produced this exact same misleading advice.
+**Причина:** та же дыра со статичной подсказкой, что в BUG-17/22, только
+другой код: `installCore()` в обоих инсталлерах бросал `E_DOWNLOAD_FAILED`
+при любом ненулевом коде выхода после всех повторов установочного скрипта,
+а подсказка в UI жёстко зашита на «check the server's network connection» -
+вживую: заполненный диск (`No space left on device`) породил ровно этот же
+вводящий в заблуждение совет.
 
-**Fix:** New `BaseInstaller.downloadFailureHint()` inspects the last failed
-attempt's stdout/stderr for the disk-full message and returns a matching
-hint; both installers now pass its result as `InstallerError`'s hint.
-Falls through to the static network-ish hint when nothing recognizable
-is found - never invents a cause it isn't sure of.
+**Исправление:** новый `BaseInstaller.downloadFailureHint()` анализирует
+stdout/stderr последней неудачной попытки на предмет сообщения о нехватке
+места и возвращает соответствующую подсказку; оба инсталлера теперь
+передают его результат как hint для `InstallerError`. При отсутствии
+узнаваемой причины откатывается на прежнюю подсказку про сеть - никогда не
+выдумывает причину, в которой нет уверенности.
 
-Files: `src/renderer/src/features/common/ErrorDetailsModal.tsx`,
+Файлы: `src/renderer/src/features/common/ErrorDetailsModal.tsx`,
 `src/main/domain/installers/BaseInstaller.ts`,
 `src/main/domain/installers/XrayRealityInstaller.ts`,
 `src/main/domain/installers/Hysteria2Installer.ts`,
 `tests/unit/XrayRealityInstaller.test.ts`.
 
-## BUG-02 (and BUG-23) - a failed preflight never actually blocks installation
+## BUG-02 (и BUG-23) - проваленный preflight никогда по-настоящему не блокирует установку
 
-**Cause:** `installStart.ts`'s `preflightStep` was a literal no-op
-(`run: async () => {}`) with a comment saying the check was "already done at
-ssh:check" - but nothing anywhere read `CheckResult.preflight.passed`
-either, on either side of the IPC boundary. A server with a busy port or a
-locked apt would run the entire install pipeline anyway and fail much
-later, deep in an unrelated step, never pointing back at the check that
-already knew the real reason. The same gap meant four of the 22 declared
-`ErrorCode`s (`E_NO_SYSTEMD`, `E_NO_OUTBOUND`, `E_APT_LOCKED`,
-`E_PORT_BUSY`) could never actually be thrown anywhere (BUG-23) - preflight
-findings never became pipeline errors, they only ever sat as informational
-`CheckItem`s.
+**Причина:** `preflightStep` в `installStart.ts` был буквальным no-op
+(`run: async () => {}`) с комментарием, что проверка «уже сделана на
+ssh:check» - но `CheckResult.preflight.passed` никто и нигде не читал, ни с
+одной стороны границы IPC. Сервер с занятым портом или заблокированным apt
+всё равно прогонял весь пайплайн установки целиком и проваливался намного
+позже, в глубине совершенно другого шага, никогда не указывая на проверку,
+которая уже знала настоящую причину. Та же дыра означала, что четыре из 22
+заявленных `ErrorCode` (`E_NO_SYSTEMD`, `E_NO_OUTBOUND`, `E_APT_LOCKED`,
+`E_PORT_BUSY`) никогда и нигде не могли быть реально брошены (BUG-23) -
+находки preflight никогда не превращались в ошибки пайплайна, а только
+сидели как информационные `CheckItem`.
 
-**Fix:**
-- `installStart.ts`'s `preflightStep` now re-runs `Preflight` against the
-  current server state (state can change between `ssh:check` and clicking
-  Install) and throws the mapped `ErrorCode` for the first failed check -
-  this is the actual server-side enforcement point, not just a UI gate.
-- `SelectStep.tsx` also disables the Install button and shows an inline
-  alert when `preflight.passed` is false, for immediate same-screen
-  feedback instead of waiting on a round trip.
-- Fixed a related gap this surfaced in `buildRunResult()`: a step shared
-  across every protocol (like the new `preflight` check, or the existing
-  `backup` step) isn't "owned" by any single unit, so its failure used to
-  report as a generic "skipped because another protocol failed" for every
-  protocol instead of the real error - `toAppError()`'s `InstallerError`/
-  `CommandRunnerError` handling is protocol-agnostic, so any unit's mapper
-  now gets used when nothing specifically owns the failing step.
+**Исправление:**
+- `preflightStep` в `installStart.ts` теперь заново прогоняет `Preflight`
+  по текущему состоянию сервера (оно может измениться между `ssh:check` и
+  нажатием Install) и бросает смапленный `ErrorCode` для первой
+  провалившейся проверки - это и есть настоящая точка серверного
+  принуждения, а не просто ограничение в UI.
+- `SelectStep.tsx` также блокирует кнопку Install и показывает встроенное
+  предупреждение, когда `preflight.passed` ложен - для мгновенной обратной
+  связи на том же экране, без ожидания round-trip.
+- Заодно исправлена смежная дыра, всплывшая в `buildRunResult()`: шаг,
+  общий для всех протоколов (как новая проверка `preflight`, так и уже
+  существовавший шаг `backup`), не «принадлежит» ни одному конкретному
+  юниту, поэтому его провал раньше репортился как общее «skipped because
+  another protocol failed» для каждого протокола вместо настоящей ошибки -
+  обработка `InstallerError`/`CommandRunnerError` в `toAppError()` не
+  зависит от протокола, поэтому теперь используется маппер любого юнита,
+  когда ничто конкретно не владеет упавшим шагом.
 
-Files: `src/main/ipc/handlers/installStart.ts`, `src/main/ipc/runOrchestration.ts`,
+Файлы: `src/main/ipc/handlers/installStart.ts`, `src/main/ipc/runOrchestration.ts`,
 `src/renderer/src/features/select/SelectStep.tsx`, `tests/unit/runOrchestration.test.ts`.
 
-## BUG-23, continued - the remaining three dead error codes
+## BUG-23, продолжение - оставшиеся три мёртвых кода ошибок
 
-Three more of the 22 declared codes were also never reachable:
+Ещё три из 22 заявленных кодов также были недостижимы:
 
 - **`E_CERT_GENERATION_FAILED`**: `CertGenerator.generateSelfSignedCert()`
-  never checked any of its `openssl` commands' exit codes. A failure
-  silently produced a missing/empty key or certificate, and
-  `parseCertFingerprint`'s own exception on the resulting garbage surfaced
-  as an unrelated generic error instead of naming the real cause. Now
-  checks each step and throws `E_CERT_GENERATION_FAILED` with the actual
-  stderr.
-- **`E_ALREADY_INSTALLED` / `E_FOREIGN_CONFIG`**: these describe pipeline
-  errors in the contract, but the only enforcement was the renderer
-  disabling the checkbox for a non-absent protocol (`PlanBuilder`) - main
-  never re-checked this itself, so a stale UI state or a direct IPC call
-  could install over an already-installed or foreign protocol with no
-  server-side objection. `installStart.ts` now re-detects protocol status
-  before starting an `install`-mode run (exempting `reinstall`, which
-  exists precisely to act on a non-absent protocol) and refuses with the
-  matching code.
+  никогда не проверял код выхода ни у одной из своих команд `openssl`.
+  Провал молча производил отсутствующий/пустой ключ или сертификат, а
+  собственное исключение `parseCertFingerprint` на этом мусоре всплывало
+  как несвязанная общая ошибка вместо указания настоящей причины. Теперь
+  каждый шаг проверяется и при провале бросает `E_CERT_GENERATION_FAILED` с
+  реальным stderr.
+- **`E_ALREADY_INSTALLED` / `E_FOREIGN_CONFIG`**: эти коды описывают ошибки
+  пайплайна в контракте, но единственным их принуждением было отключение
+  чекбокса в renderer для протокола не в состоянии absent (`PlanBuilder`) -
+  main никогда не перепроверял это сам, поэтому устаревшее состояние UI или
+  прямой вызов IPC мог запустить установку поверх уже установленного или
+  чужого протокола без какого-либо возражения со стороны сервера.
+  `installStart.ts` теперь заново определяет статус протокола перед началом
+  прогона в режиме `install` (за исключением `reinstall`, который как раз и
+  существует для действия над протоколом не в состоянии absent) и
+  отказывает с соответствующим кодом.
 
-Together with BUG-02's fix, all 7 previously-dead codes are now genuinely
-reachable.
+Вместе с исправлением BUG-02 все 7 ранее мёртвых кодов теперь по-настоящему
+достижимы.
 
-Files: `src/main/domain/CertGenerator.ts`, `src/main/ipc/handlers/installStart.ts`,
+Файлы: `src/main/domain/CertGenerator.ts`, `src/main/ipc/handlers/installStart.ts`,
 `tests/unit/CertGenerator.test.ts`.
 
-## BUG-03 - closing the window doesn't stop the run or close SSH (blocker)
+## BUG-03 - закрытие окна не останавливает прогон и не закрывает SSH (блокер)
 
-**Cause:** No handler on the window's own `close` event ever cancelled an
-in-flight `Pipeline` or disposed its `SshSession`. On macOS,
-`window-all-closed` doesn't call `app.quit()` (by design, so `Cmd+Q` and the
-window's close button behave differently) - so closing the window via its
-own button left the process alive with no window to show progress in,
-while the install/remove pipeline ran to completion entirely unseen. `Cmd+Q`
-(`app.quit()`) already stopped everything correctly, since the whole
-process exits; the close button was the one path that let a run finish
-silently in the background - confirmed live three times, on the early,
-middle, and late steps of an install.
+**Причина:** ни один обработчик на собственном событии `close` окна никогда
+не отменял выполняющийся `Pipeline` и не освобождал его `SshSession`. На
+macOS `window-all-closed` не вызывает `app.quit()` (так и задумано, чтобы
+`Cmd+Q` и кнопка закрытия окна вели себя по-разному) - поэтому закрытие окна
+собственной кнопкой оставляло процесс живым без единого окна, в котором
+можно было бы видеть прогресс, а пайплайн установки/удаления доводился до
+конца полностью незамеченным. `Cmd+Q` (`app.quit()`) и так всё останавливал
+корректно, поскольку весь процесс завершается; кнопка закрытия окна была
+единственным путём, позволявшим прогону тихо завершиться в фоне -
+подтверждено вживую трижды, на раннем, среднем и позднем шагах установки.
 
-**Fix:** `createWindow()` now attaches a `close` listener that requests
-cancellation of every tracked run (new `runRegistry.requestCancelAll()`)
-and disposes every live SSH session (new
-`sessionRegistry.disposeAllSessions()`). Cancelling alone only stops a step
-that hasn't started yet (tech.md 5.12: the currently-running step always
-finishes on its own) - disposing the session is what actually aborts an
-in-flight command, by killing the connection it depends on. Verified live:
-launched the built app, closed its window via CDP (`page.close()`, the same
-close path as the window's own button) with no crash and no window left
-behind; the process stayed alive as before (expected on macOS, unchanged),
-and closing it produced no exception in the process log.
+**Исправление:** `createWindow()` теперь навешивает обработчик `close`,
+который запрашивает отмену всех отслеживаемых прогонов (новая
+`runRegistry.requestCancelAll()`) и освобождает все живые SSH-сессии (новая
+`sessionRegistry.disposeAllSessions()`). Одна только отмена останавливает
+лишь ещё не начавшийся шаг (tech.md 5.12: уже выполняющийся шаг всегда
+доводится до конца) - именно освобождение сессии реально прерывает
+выполняющуюся команду, убивая соединение, от которого она зависит.
+Проверено вживую: собранное приложение запущено, его окно закрыто через CDP
+(`page.close()`, тот же путь закрытия, что и у собственной кнопки окна) без
+падения и без оставшегося окна; процесс остался жив как и раньше (ожидаемо
+для macOS, без изменений), и его закрытие не породило исключения в логе
+процесса.
 
-Files: `src/main/index.ts`, `src/main/pipeline/runRegistry.ts`,
+Файлы: `src/main/index.ts`, `src/main/pipeline/runRegistry.ts`,
 `src/main/ssh/sessionRegistry.ts`.
