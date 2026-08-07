@@ -28,12 +28,7 @@
 
 </div>
 
-<!--
-  Video: GitHub only renders a player for its own user-attachments CDN.
-  Drag docs/readme/uplink.mp4 into any issue or comment on this repository,
-  copy the https://github.com/user-attachments/assets/<uuid> link it produces,
-  and paste it below on a line of its own - no tags, no markdown.
--->
+https://github.com/user-attachments/assets/5a60c565-79a0-41a1-a4c0-616e2d3404a6
 
 ## Installation
 
