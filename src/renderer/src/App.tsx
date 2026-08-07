@@ -13,7 +13,7 @@ import { SelectStep } from './features/select/SelectStep';
 export default function App() {
   const checkResult = useAppStore((state) => state.checkResult);
   const setCheckResult = useAppStore((state) => state.setCheckResult);
-  const setProtocols = useAppStore((state) => state.setProtocols);
+  const applyRefresh = useAppStore((state) => state.applyRefresh);
   const deployParams = useAppStore((state) => state.deployParams);
   const setDeployParams = useAppStore((state) => state.setDeployParams);
   const run = useAppStore((state) => state.run);
@@ -101,10 +101,10 @@ export default function App() {
    * case where re-entering credentials is genuinely required.
    */
   const handleDone = async () => {
-    if (!checkResult) return;
+    if (!checkResult || !deployParams) return;
     try {
-      const protocols = await window.uplink.protocolsRefresh(checkResult.sessionId);
-      setProtocols(protocols);
+      const refreshed = await window.uplink.protocolsRefresh(checkResult.sessionId, deployParams);
+      applyRefresh(refreshed);
       resetRun();
     } catch {
       resetRun();

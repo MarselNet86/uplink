@@ -6,9 +6,10 @@ import type {
   AppError,
   CheckRequest,
   CheckResult,
+  DeployParams,
   InstallRequest,
   ProgressEvent,
-  ProtocolStatus,
+  RefreshResult,
   RemoveRequest,
   RunHandle,
 } from '@shared/types';
@@ -79,8 +80,8 @@ const api = {
     return () => ipcRenderer.removeListener(IPC.PROGRESS_EVENT, listener);
   },
 
-  protocolsRefresh: (sessionId: string): Promise<ProtocolStatus[]> =>
-    invokeChecked(IPC.PROTOCOLS_REFRESH, { sessionId }),
+  protocolsRefresh: (sessionId: string, params: DeployParams): Promise<RefreshResult> =>
+    invokeChecked(IPC.PROTOCOLS_REFRESH, { sessionId, params }),
 
   copyText: (text: string): Promise<void> => ipcRenderer.invoke(IPC.CLIPBOARD_WRITE, { text }),
 };

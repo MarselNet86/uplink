@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { checkRequestSchema, checkResultSchema } from '@shared/schemas';
+import {
+  checkRequestSchema,
+  checkResultSchema,
+  protocolsRefreshRequestSchema,
+} from '@shared/schemas';
 
 describe('checkRequestSchema', () => {
   it('accepts a well-formed self-signed request', () => {
@@ -65,5 +69,22 @@ describe('checkResultSchema', () => {
         protocols: [{ protocol: 'vless-reality', state: 'bogus', serviceActive: false }],
       }),
     ).toThrow();
+  });
+});
+
+describe('protocolsRefreshRequestSchema', () => {
+  it('accepts a sessionId together with the deploy params', () => {
+    expect(() =>
+      protocolsRefreshRequestSchema.parse({
+        sessionId: 's1',
+        params: { distroHint: 'auto', tlsMode: 'self-signed' },
+      }),
+    ).not.toThrow();
+  });
+
+  // Preflight is re-run on the same refresh and checkPorts/checkDns branch on
+  // tlsMode and domain, so a refresh without params cannot be served.
+  it('rejects a request that carries only the sessionId', () => {
+    expect(() => protocolsRefreshRequestSchema.parse({ sessionId: 's1' })).toThrow();
   });
 });

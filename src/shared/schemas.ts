@@ -154,6 +154,9 @@ export const sessionCloseRequestSchema = z.object({
 
 export const protocolsRefreshRequestSchema = z.object({
   sessionId: z.string().min(1),
+  // Preflight is re-run on the same refresh, and checkPorts/checkDns branch
+  // on tlsMode and domain - so the params from step 1 have to come along.
+  params: deployParamsSchema,
 });
 
 /** Bounded so a runaway renderer cannot push unlimited data into the OS clipboard. */

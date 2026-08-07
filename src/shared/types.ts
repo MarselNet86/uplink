@@ -89,6 +89,18 @@ export interface CheckResult {
   protocols: ProtocolStatus[];
 }
 
+/**
+ * What protocols:refresh returns (tech.md section 6, v6): everything on step
+ * 2 that an install/remove can invalidate. The protocol list alone was not
+ * enough - `preflight` is just as stale after a run, and once SelectStep
+ * started gating the Install button on `preflight.passed` a removed protocol
+ * still showed as holding its port, leaving no way forward from step 2.
+ */
+export interface RefreshResult {
+  preflight: PreflightReport;
+  protocols: ProtocolStatus[];
+}
+
 export type InstallMode = 'install' | 'reinstall';
 
 export interface InstallRequest {

@@ -3,7 +3,7 @@ import type {
   AppError,
   CheckResult,
   DeployParams,
-  ProtocolStatus,
+  RefreshResult,
   RunResult,
   StepView,
 } from '@shared/types';
@@ -29,8 +29,14 @@ interface AppState {
   setFatalError: (fatal: FatalError | null) => void;
   checkResult: CheckResult | null;
   setCheckResult: (result: CheckResult | null) => void;
-  /** Replaces just the detected protocols, keeping the session/distro/preflight from ssh:check. */
-  setProtocols: (protocols: ProtocolStatus[]) => void;
+  /**
+   * Applies a protocols:refresh reading over the ssh:check snapshot, keeping
+   * the session and distro (neither can change while the session is open).
+   * Preflight has to be replaced along with the protocol list: SelectStep
+   * gates Install on `preflight.passed`, so a stale report left step 2 with
+   * no way forward after a remove.
+   */
+  applyRefresh: (result: RefreshResult) => void;
   deployParams: DeployParams | null;
   setDeployParams: (params: DeployParams | null) => void;
   run: RunState | null;
@@ -47,9 +53,9 @@ export const useAppStore = create<AppState>((set) => ({
   setFatalError: (fatalError) => set({ fatalError }),
   checkResult: null,
   setCheckResult: (checkResult) => set({ checkResult }),
-  setProtocols: (protocols) =>
+  applyRefresh: ({ preflight, protocols }) =>
     set((state) =>
-      state.checkResult ? { checkResult: { ...state.checkResult, protocols } } : state,
+      state.checkResult ? { checkResult: { ...state.checkResult, preflight, protocols } } : state,
     ),
   deployParams: null,
   setDeployParams: (deployParams) => set({ deployParams }),
