@@ -39,8 +39,6 @@ https://github.com/user-attachments/assets/5a60c565-79a0-41a1-a4c0-616e2d3404a6
 | Windows               | [`Setup .exe`](https://github.com/MarselNet86/uplink/releases/latest)         |
 | Linux                 | [`.AppImage` / `.deb`](https://github.com/MarselNet86/uplink/releases/latest) |
 
-Builds are unsigned. macOS: right-click the app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/Uplink.app`. Windows: **More info → Run anyway**. Verify downloads against `SHA256SUMS` published with each release.
-
 ## Protocols
 
 Both install on port 443 at once and do not conflict — one takes TCP, the other UDP.
