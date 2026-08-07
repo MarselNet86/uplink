@@ -121,6 +121,49 @@ describe('Preflight', () => {
     expect(items.find((i) => i.id === 'ports')).toMatchObject({ status: 'fail' });
   });
 
+  it('warns instead of failing when 443 is held by this app own services', async () => {
+    const runner = makeHappyRunner();
+    runner.script('ss -tulnp', {
+      stdout:
+        'Netid State Recv-Q Send-Q Local Peer Process\n' +
+        'tcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:* users:(("xray",pid=1,fd=1))\n' +
+        'udp UNCONN 0 0 0.0.0.0:443 0.0.0.0:* users:(("hysteria",pid=2,fd=2))\n',
+    });
+
+    const { items } = await new Preflight(runner, 0).run(
+      { distroHint: 'auto', tlsMode: 'self-signed' },
+      '203.0.113.10',
+    );
+
+    // A reinstall exists to replace exactly these processes, so this must not
+    // fail: the preflight step is critical and enforces its own result, which
+    // made every reinstall impossible while this returned 'fail'.
+    expect(items.find((i) => i.id === 'ports')).toMatchObject({ status: 'warn' });
+    expect(items.every((i) => i.status !== 'fail')).toBe(true);
+  });
+
+  it('still fails when a foreign process shares 443 with one of our own', async () => {
+    const runner = makeHappyRunner();
+    runner.script('ss -tulnp', {
+      stdout:
+        'Netid State Recv-Q Send-Q Local Peer Process\n' +
+        'tcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:* users:(("xray",pid=1,fd=1))\n' +
+        'udp UNCONN 0 0 0.0.0.0:443 0.0.0.0:* users:(("dnsmasq",pid=2,fd=2))\n',
+    });
+
+    const { items } = await new Preflight(runner, 0).run(
+      { distroHint: 'auto', tlsMode: 'self-signed' },
+      '203.0.113.10',
+    );
+
+    const ports = items.find((i) => i.id === 'ports');
+    expect(ports).toMatchObject({ status: 'fail' });
+    // Only the actual conflict is named - listing our own service next to it
+    // would send the user hunting for a process that is meant to be there.
+    expect(ports?.detail).toContain('dnsmasq');
+    expect(ports?.detail).not.toContain('xray');
+  });
+
   it('checks 80/tcp only for tlsMode acme-domain, never for self-signed (tech.md 5.8)', async () => {
     const busyOn80 = {
       stdout:

@@ -13,6 +13,21 @@ export interface PreflightRunResult {
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Process names of the services this app installs itself, as `ss -tulnp`
+ * reports them. A listener on 443 owned by one of these is not a port
+ * conflict - reinstall exists precisely to replace that process - so it must
+ * not fail the check: the preflight step is `critical`, and once it started
+ * actually enforcing its result (BUG-02/BUG-23) a blanket "port is busy"
+ * made every reinstall impossible. An unrecognised (or unnamed) process is
+ * still a real conflict and still fails.
+ */
+const OWN_LISTENER_PROCESSES = new Set(['xray', 'hysteria', 'hysteria-server']);
+
+function isOwnListener(process: string | undefined): boolean {
+  return process !== undefined && OWN_LISTENER_PROCESSES.has(process);
+}
+
+/**
  * Runs preflight checks 3-10 from tech.md 5.4 over an already-connected,
  * already-authenticated session (checks 1 TCP and 2 SSH auth happen before
  * a runner even exists, so the ssh:check handler builds those two items
@@ -115,10 +130,19 @@ export class Preflight {
 
     if (busy.length === 0) return { id: 'ports', status: 'ok' };
 
-    const detail = busy
-      .map((b) => `${b.proto}/${b.port} is busy with process ${b.listener?.process ?? '?'}`)
-      .join('; ');
-    return { id: 'ports', status: 'fail', detail };
+    const describe = (b: (typeof busy)[number]): string =>
+      `${b.proto}/${b.port} is busy with process ${b.listener?.process ?? '?'}`;
+
+    const foreign = busy.filter((b) => !isOwnListener(b.listener?.process));
+    if (foreign.length > 0) {
+      return { id: 'ports', status: 'fail', detail: foreign.map(describe).join('; ') };
+    }
+
+    return {
+      id: 'ports',
+      status: 'warn',
+      detail: `${busy.map(describe).join('; ')} - this app's own service, a reinstall replaces it`,
+    };
   }
 
   private async checkDns(params: DeployParams, connectedHost: string): Promise<CheckItem> {
