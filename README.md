@@ -32,12 +32,12 @@ https://github.com/user-attachments/assets/5a60c565-79a0-41a1-a4c0-616e2d3404a6
 
 ## Installation
 
-| Platform              | Download                                                                      |
-| :-------------------- | :---------------------------------------------------------------------------- |
-| macOS (Apple Silicon) | [`.dmg`](https://github.com/MarselNet86/uplink/releases/latest)               |
-| macOS (Intel)         | [`.dmg`](https://github.com/MarselNet86/uplink/releases/latest)               |
-| Windows               | [`Setup .exe`](https://github.com/MarselNet86/uplink/releases/latest)         |
-| Linux                 | [`.AppImage` / `.deb`](https://github.com/MarselNet86/uplink/releases/latest) |
+| Platform              | Download                                                                                                                                                                                                                                          |
+| :-------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| macOS (Apple Silicon) | [`Uplink-mac-arm64.dmg`](https://github.com/MarselNet86/uplink/releases/latest/download/Uplink-mac-arm64.dmg)                                                                                                                                     |
+| macOS (Intel)         | [`Uplink-mac-x64.dmg`](https://github.com/MarselNet86/uplink/releases/latest/download/Uplink-mac-x64.dmg)                                                                                                                                         |
+| Windows               | [`Uplink-win-x64.exe`](https://github.com/MarselNet86/uplink/releases/latest/download/Uplink-win-x64.exe)                                                                                                                                         |
+| Linux                 | [`Uplink-linux-x86_64.AppImage`](https://github.com/MarselNet86/uplink/releases/latest/download/Uplink-linux-x86_64.AppImage) · [`Uplink-linux-amd64.deb`](https://github.com/MarselNet86/uplink/releases/latest/download/Uplink-linux-amd64.deb) |
 
 ## Protocols
 
