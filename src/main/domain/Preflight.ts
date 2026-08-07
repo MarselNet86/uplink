@@ -114,7 +114,12 @@ export class Preflight {
       : { id: 'outbound', status: 'fail', detail: 'no outbound internet access' };
   }
 
-  private async checkPorts(params: DeployParams): Promise<CheckItem> {
+  /**
+   * Public because it is the one check an install or a remove can invalidate,
+   * so protocols:refresh re-runs just this instead of all of section 5.4
+   * (tech.md 5.4 / section 6, v6).
+   */
+  async checkPorts(params: DeployParams): Promise<CheckItem> {
     const ss = await this.runner.run('ss -tulnp');
     const entries = parseListenPorts(ss.stdout);
 

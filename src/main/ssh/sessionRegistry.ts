@@ -1,8 +1,18 @@
+import type { PreflightReport } from '@shared/types';
 import type { SshSession } from './SshSession';
 
 interface SessionEntry {
   session: SshSession;
   host: string;
+  /**
+   * The report ssh:check produced for this session. protocols:refresh reuses
+   * it instead of re-running all of section 5.4: privileges, distro, arch and
+   * systemd cannot change while the session is open, and outbound/apt-lock
+   * are unaffected by an install or a remove - only `ports` is. Re-running
+   * everything put a curl to github.com and seven extra SSH round-trips
+   * behind the Done button for no new information.
+   */
+  preflight: PreflightReport;
 }
 
 /**
@@ -13,8 +23,13 @@ interface SessionEntry {
  */
 const sessions = new Map<string, SessionEntry>();
 
-export function registerSession(sessionId: string, session: SshSession, host: string): void {
-  sessions.set(sessionId, { session, host });
+export function registerSession(
+  sessionId: string,
+  session: SshSession,
+  host: string,
+  preflight: PreflightReport,
+): void {
+  sessions.set(sessionId, { session, host, preflight });
   // The idle timer disposes the session itself (SshSession has no notion of
   // sessionId), but the Map entry has to be dropped too - otherwise
   // getSession() keeps "finding" a disposed session after the timeout fires
@@ -31,6 +46,11 @@ export function getSession(sessionId: string): SshSession | undefined {
 
 export function getSessionHost(sessionId: string): string | undefined {
   return sessions.get(sessionId)?.host;
+}
+
+/** The ssh:check report for this session, the baseline protocols:refresh patches. */
+export function getSessionPreflight(sessionId: string): PreflightReport | undefined {
+  return sessions.get(sessionId)?.preflight;
 }
 
 export function disposeSession(sessionId: string): void {

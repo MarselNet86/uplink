@@ -105,7 +105,7 @@ export async function handleSshCheck(
   const passed = items.every((item) => item.status !== 'fail');
 
   const sessionId = randomUUID();
-  registerSession(sessionId, session, credentials.host);
+  registerSession(sessionId, session, credentials.host, { items, passed });
 
   return {
     sessionId,

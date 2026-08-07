@@ -5,7 +5,7 @@ import type { AppError, DeployParams, RefreshResult } from '@shared/types';
 import { Preflight } from '../../domain/Preflight';
 import { ProtocolDetector } from '../../domain/ProtocolDetector';
 import { TokenExtractor } from '../../domain/TokenExtractor';
-import { getSession, getSessionHost } from '../../ssh/sessionRegistry';
+import { getSession, getSessionHost, getSessionPreflight } from '../../ssh/sessionRegistry';
 
 /**
  * Re-reads the server state on an already-open session (tech.md section 6,
@@ -14,13 +14,22 @@ import { getSession, getSessionHost } from '../../ssh/sessionRegistry';
  * credentials just to refresh it, the select step asks for a fresh reading
  * over the live session.
  *
- * Preflight is re-run alongside the protocol list because it goes stale in
- * exactly the same way: after removing a protocol its port is free again,
- * but the old report still showed it busy, and SelectStep gates the Install
- * button on `preflight.passed` - so step 2 became a dead end with no way to
- * clear it except reconnecting. Token extraction runs here too, so the
- * returned list always carries connection links for installed protocols,
- * matching ssh:check behaviour.
+ * The preflight report is refreshed too, because it goes stale in exactly the
+ * same way: after removing a protocol its port is free again, but the old
+ * report still showed it busy, and SelectStep gates the Install button on
+ * `preflight.passed` - so step 2 became a dead end with no way to clear it
+ * except reconnecting.
+ *
+ * Only `ports` is re-read, patched over the ssh:check baseline. Privileges,
+ * distro, arch and systemd cannot change while the session is open, and
+ * outbound/apt-lock are unaffected by an install or a remove - re-running all
+ * of section 5.4 put a curl to github.com and seven extra SSH round-trips
+ * behind the Done button for no new information. This report is advisory
+ * anyway: installStart re-runs the full preflight server-side before touching
+ * anything, and that is what actually gates a run.
+ *
+ * Token extraction runs here too, so the returned list always carries
+ * connection links for installed protocols, matching ssh:check behaviour.
  */
 export async function handleProtocolsRefresh(
   _event: IpcMainInvokeEvent,
@@ -46,7 +55,13 @@ export async function handleProtocolsRefresh(
   const raw = await new ProtocolDetector(runner).detect();
   const protocols = await new TokenExtractor(runner, host).enrichWithLinks(raw);
 
-  const { items } = await new Preflight(runner).run(params, host);
+  const ports = await new Preflight(runner).checkPorts(params);
+  // No baseline only if the session vanished between the two lookups above,
+  // in which case the single fresh item is still better than nothing.
+  const baseline = getSessionPreflight(sessionId)?.items ?? [];
+  const items = baseline.some((item) => item.id === 'ports')
+    ? baseline.map((item) => (item.id === 'ports' ? ports : item))
+    : [...baseline, ports];
   const passed = items.every((item) => item.status !== 'fail');
 
   return { preflight: { items, passed }, protocols };
