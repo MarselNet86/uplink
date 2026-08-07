@@ -231,6 +231,30 @@ describe('Hysteria2Installer - error paths', () => {
 
     expect(result.ok).toBe(false);
     expect(result.error?.code).toBe('E_ACME_FAILED');
+    // Nothing in the journal points at a rate limit, so no hint is invented.
+    expect(result.error?.hint).toBeUndefined();
+  });
+
+  it('names the sslip.io rate limit when the journal shows one', async () => {
+    const runner = makeHappyRunner();
+    runner.script('ss -tulnp', { stdout: 'Netid State Recv-Q Send-Q Local Peer Process\n' });
+    runner.script('journalctl -u hysteria-server.service -n 100 --no-pager 2>/dev/null || true', {
+      stdout:
+        'hysteria[1]: failed to obtain certificate: acme: error: 429 ' +
+        'urn:ietf:params:acme:error:rateLimited: too many certificates ' +
+        'already issued for "sslip.io"\n',
+    });
+
+    const { outcome } = install(acmeParams, runner);
+    const result = await outcome;
+
+    expect(result.error?.code).toBe('E_ACME_FAILED');
+    // sslip.io is not on the Public Suffix List, so the whole domain is one
+    // Let's Encrypt bucket shared with every other sslip.io user - without
+    // this hint the user only sees "not listening on 443/udp" and has no way
+    // to learn that the fix is their own domain.
+    expect(result.error?.hint).toContain('sslip.io');
+    expect(result.error?.hint).toContain('your own domain');
   });
 
   it('rolls back to .bak and stops the service on cancellation after writeConfig', async () => {

@@ -196,6 +196,33 @@ export class Hysteria2Installer extends BaseInstaller {
     this.fingerprint = cert.fingerprint;
   }
 
+  /**
+   * Why ACME failed, read back from the service journal.
+   *
+   * The default path issues for `<ip>.sslip.io`, and `sslip.io` is not on the
+   * Public Suffix List - so Let's Encrypt resolves the registered domain to
+   * `sslip.io` itself and counts every install against one "certificates per
+   * registered domain" bucket shared with every sslip.io user on the
+   * internet. When that bucket is empty the certificate never arrives and
+   * the service simply never binds, which looks exactly like any other ACME
+   * failure. Without this the user is told the port is not listening and has
+   * no way to learn that the fix is to use their own domain.
+   */
+  private async acmeFailureHint(): Promise<string | undefined> {
+    const log = await this.runner.runPrivileged(
+      `journalctl -u ${HY2_SERVICE} -n 100 --no-pager 2>/dev/null || true`,
+    );
+    const text = `${log.stdout}\n${log.stderr}`;
+    if (/rate ?limit|too many certificates/i.test(text)) {
+      return (
+        "Let's Encrypt refused to issue: the rate limit for sslip.io is exhausted. " +
+        'That quota is shared by everyone using sslip.io, not just you. ' +
+        'Use your own domain on step 1 to get a certificate of your own.'
+      );
+    }
+    return undefined;
+  }
+
   /** User-supplied masquerade SNI, or the built-in default. Never resolved (tech.md 5.7 H4s). */
   private fakeSni(): string {
     return this.params.hysteriaSni || HYSTERIA_FAKE_SNI;
@@ -220,10 +247,11 @@ export class Hysteria2Installer extends BaseInstaller {
       pollIntervalMs: this.verifyPollIntervalMs,
     });
     if (!ok) {
-      throw new InstallerError(
-        isAcme ? 'E_ACME_FAILED' : 'E_SERVICE_FAILED',
-        'hysteria-server is not active or not listening on 443/udp',
-      );
+      const message = 'hysteria-server is not active or not listening on 443/udp';
+      if (isAcme) {
+        throw new InstallerError('E_ACME_FAILED', message, await this.acmeFailureHint());
+      }
+      throw new InstallerError('E_SERVICE_FAILED', message);
     }
     if (isAcme) await this.allowFirewallPort(80, 'tcp');
     await this.allowFirewallPort(443, 'udp');
