@@ -1,8 +1,9 @@
 # tech.md - Uplink
 
-**Версия ядра: v5**
+**Версия ядра: v6**
 
 Changelog:
+- `v6` - **`protocols:refresh` возвращает `RefreshResult` (`{ preflight, protocols }`) вместо `ProtocolStatus[]`**, а его request дополнен `params: DeployParams` (preflight ветвится по `tlsMode`/`domain`, без параметров его не прогнать). Причина: после установки или удаления renderer обновлял только список протоколов, а `PreflightReport` оставался снимком времени `ssh:check`. После того как `SelectStep` начал блокировать кнопку Install по `preflight.passed` (v5, фикс BUG-17/BUG-22), удалённый протокол продолжал числиться занимающим `443`, кнопка не разблокировывалась, и шаг 2 становился тупиком - выйти можно было только через Back с повторным вводом пароля. Изменены: `protocolsRefreshRequestSchema`, `handleProtocolsRefresh`, `preload/index.ts`, `useAppStore.setProtocols` -> `applyRefresh`. Добавлен тип `RefreshResult`. Заодно в таблицу раздела 6 внесены каналы `protocols:refresh` и `clipboard:write`: они добавлены ещё в v4, но в таблицу тогда не попали. Отдельно, **без изменения контракта**: `Preflight.checkPorts` перестал отдавать `fail` на слушателе `443`, принадлежащем `xray`/`hysteria` - раздел 5.4 (проверка 8) всегда требовал `E_PORT_BUSY` только для **чужого** процесса, а код не различал свой и чужой. С момента, когда шаг `preflight` стал критическим и начал обеспечивать свой результат (v5, фикс BUG-02/BUG-23), это делало невозможной любую переустановку: она падала на том, что порт занят сервисом, который она пришла заменить.
 - `v5` - продукт нацелен прежде всего на англоязычную (американскую) аудиторию, поэтому весь пользовательский текст переведён с русского на английский: `errorText.ts` (заголовки/подсказки по `ErrorCode`), `errorReport.ts` (лейблы диагностического отчёта), все строки renderer-компонентов (`ConnectForm`, `SelectStep`, `InstallStep`, `ConflictModal`, `ResultStep`, `HostKeyPromptModal`, UI-примитивы), заголовки шагов пайплайна (`StepSpec.title` во всех инсталлерах/ремуверах, `installStart.ts`, `runOrchestration.ts`), детали `CheckItem` в `Preflight.ts`, и сообщения `AppError`/предупреждений, формируемые в main (`SshSession.ts`, IPC-хендлеры, `BaseInstaller.allowFirewallPort`, `XrayRealityInstaller`, ремуверы). Изменены аннотации языка в контрактах: `StepView.title` и `AppError.message` теперь `// en`, а не `// ru` (раздел 5.11, раздел 7). Код и комментарии не переводились - раздел 10.3 уже требовал английский для них. `tech.md` остаётся на русском как внутренняя документация для разработки, это не пользовательский текст.
 - `v1` - первичная фиксация: стек, архитектура процессов, IPC-контракты, доменные типы, пайплайн развёртывания VLESS+Reality и Hysteria2, правила кода и коммитов, дорожная карта.
 - `v2` - домен для пользователя больше не обязателен. Hysteria2 по умолчанию работает на self-signed сертификате с `pinSHA256` в ссылке, ACME-путь остаётся опцией (`TlsMode`). У Reality убрано поле SNI из формы: донор выбирается из встроенного списка автоматически. Изменены: форма шага 1, `DeployParams`, `PreflightReport` (условные проверки), `ErrorCode`, шаги пайплайна Hysteria2, `LinkBuilder`, добавлен `security/CertGenerator.ts`.
@@ -311,7 +312,7 @@ export interface IFileTransfer {
 5. **Архитектура.** `uname -m` -> `x86_64` | `aarch64`. Иначе - `E_ARCH_UNSUPPORTED`.
 6. **systemd.** `command -v systemctl && systemctl is-system-running --quiet || true`. Отсутствие systemctl - `E_NO_SYSTEMD`.
 7. **Сеть наружу.** `curl -fsS -m 10 -o /dev/null https://github.com` (при отсутствии curl - `wget -q --spider`). Ошибка - `E_NO_OUTBOUND`.
-8. **Занятость портов.** `ss -tulnp` -> парсер `listenPorts.ts`. Проверяются `443/tcp` (Reality), `443/udp` (Hysteria2). `80/tcp` проверяется только при `TlsMode: 'acme-domain'` (нужен под http-01), в `self-signed` не участвует. Занятость чужим процессом - `E_PORT_BUSY` с указанием процесса.
+8. **Занятость портов.** `ss -tulnp` -> парсер `listenPorts.ts`. Проверяются `443/tcp` (Reality), `443/udp` (Hysteria2). `80/tcp` проверяется только при `TlsMode: 'acme-domain'` (нужен под http-01), в `self-signed` не участвует. Занятость чужим процессом - `E_PORT_BUSY` с указанием процесса. Занятость **своим** сервисом (`xray`, `hysteria`) - не конфликт, а ожидаемое состояние переустановки: статус `warn`, не `fail`, иначе критический шаг `preflight` рубит переустановку на том, что порт держит сервис, который она пришла заменить.
 9. **DNS для Hysteria2.** Только если выбран Hysteria2 **и** включён `TlsMode: 'acme-domain'`: `getent hosts <domain>` на сервере и сверка с внешним IP (`curl -fsS https://api.ipify.org` либо адресом подключения). Несовпадение - `E_DNS_MISMATCH` с текстом «<domain>'s A record does not point to <ip>». В режиме `self-signed` (дефолт) проверка пропускается, домен не участвует.
 10. **Блокировка apt.** `fuser /var/lib/dpkg/lock-frontend` или проверка `apt-get -qq check`. Занято - `E_APT_LOCKED`, ретрай 3 раза по 10 с, затем ошибка.
 
@@ -706,6 +707,8 @@ export const IPC = {
   INSTALL_START:    'install:start',
   INSTALL_CANCEL:   'install:cancel',
   PROTOCOLS_REMOVE: 'protocols:remove',
+  PROTOCOLS_REFRESH:'protocols:refresh',
+  CLIPBOARD_WRITE:  'clipboard:write',
   SESSION_CLOSE:    'session:close',
   HOSTKEY_CONFIRM:  'hostkey:confirm',
   // main -> renderer, send
@@ -720,6 +723,8 @@ export const IPC = {
 | `install:start` | invoke | `InstallRequest` | `RunHandle` |
 | `install:cancel` | invoke | `{ runId: string }` | `{ accepted: boolean }` |
 | `protocols:remove` | invoke | `RemoveRequest` | `RunHandle` |
+| `protocols:refresh` | invoke | `{ sessionId: string, params: DeployParams }` | `RefreshResult` |
+| `clipboard:write` | invoke | `{ text: string }` | `void` |
 | `session:close` | invoke | `{ sessionId: string }` | `void` |
 | `hostkey:confirm` | invoke | `{ promptId, accepted }` | `void` |
 | `progress:event` | send | - | `ProgressEvent` |
@@ -793,6 +798,13 @@ export interface CheckRequest {
 export interface CheckResult {
   sessionId: string;
   distro: DistroInfo;
+  preflight: PreflightReport;
+  protocols: ProtocolStatus[];
+}
+
+// Ответ protocols:refresh (v6): всё на шаге 2, что может устареть после
+// прогона. Одного списка протоколов мало - preflight устаревает ровно так же.
+export interface RefreshResult {
   preflight: PreflightReport;
   protocols: ProtocolStatus[];
 }
