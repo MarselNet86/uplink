@@ -6,7 +6,7 @@ import { Collapsible } from '../../ui/Collapsible';
 import { Input } from '../../ui/Input';
 import { PasswordInput } from '../../ui/PasswordInput';
 import { ErrorDetailsModal } from '../common/ErrorDetailsModal';
-import { validateConnectForm } from './formValidation';
+import { buildDeployParams, validateConnectForm } from './formValidation';
 import type { ConnectFormErrors, ConnectFormValues } from './formValidation';
 
 const initialValues: ConnectFormValues = {
@@ -42,22 +42,7 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
 
     setLoading(true);
     try {
-      // Omitted rather than sent empty: exactOptionalPropertyTypes and the
-      // zod schema both treat these as "absent means use the default".
-      const sni = {
-        ...(values.realitySni.trim() ? { realitySni: values.realitySni.trim() } : {}),
-        ...(values.hysteriaSni.trim() ? { hysteriaSni: values.hysteriaSni.trim() } : {}),
-      };
-      // BUG-07/BUG-08: self-signed is the actual default (tech.md section
-      // 4) - a domain (and therefore acme-domain) is only ever used once
-      // the user explicitly opts in via the checkbox.
-      const domain = values.domainOverride ? values.domain.trim() : '';
-      const acmeEmail = values.domainOverride ? values.acmeEmail.trim() : '';
-      // Distro is always auto-detected server-side (Preflight); the form
-      // never asked the user for it, so there is nothing to override here.
-      const params: DeployParams = domain
-        ? { distroHint: 'auto', tlsMode: 'acme-domain', domain, acmeEmail, ...sni }
-        : { distroHint: 'auto', tlsMode: 'self-signed', ...sni };
+      const params: DeployParams = buildDeployParams(values);
       const result = await window.uplink.sshCheck({
         credentials: {
           host: values.host.trim(),
@@ -115,9 +100,9 @@ export function ConnectForm({ onChecked }: ConnectFormProps) {
 
       <Collapsible title="Domain for Hysteria2 · optional">
         <p className="field-hint" style={{ marginBottom: 'var(--s2)' }}>
-          By default Hysteria2 uses a self-signed certificate - no domain needed. Check the box
-          below only if you already have your own domain pointed at this server, to get a trusted
-          Let&apos;s Encrypt certificate instead.
+          By default Hysteria2 gets a free <span className="mono">sslip.io</span> domain derived
+          from the address above, and a real Let&apos;s Encrypt certificate for it - nothing to buy
+          or register. Check the box below to use a domain you already own instead.
         </p>
         <Checkbox
           checked={values.domainOverride}

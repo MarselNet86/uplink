@@ -1,3 +1,5 @@
+import type { DeployParams } from '@shared/types';
+
 /** Lightweight client-side field validation, tech.md section 4. The zod
  * schemas validate the same payload again at the IPC boundary; this layer
  * only exists to show inline hints before a round trip to main. */
@@ -47,6 +49,40 @@ export function deriveAutoDomain(host: string): string {
 /** Placeholder ACME contact for the auto domain path - Let's Encrypt only needs a syntactically valid address, never sent anywhere unless the cert is about to expire. */
 export function deriveAutoAcmeEmail(domain: string): string {
   return `admin@${domain}`;
+}
+
+/**
+ * Maps the form to DeployParams (tech.md section 4).
+ *
+ * Lives here rather than inside ConnectForm.submit() because this mapping is
+ * exactly what BUG-07 got wrong - the auto domain was computed regardless of
+ * the checkbox, so the user's own domain never arrived and self-signed was
+ * unreachable - and inside the component there was nothing a test could aim
+ * at. Two rules carry the whole thing: the checkbox always wins when it is
+ * on, and anything with no derivable domain falls back to self-signed rather
+ * than guessing.
+ *
+ * Distro is always auto-detected server-side by Preflight; the form never
+ * asks, so there is nothing to override here.
+ */
+export function buildDeployParams(values: ConnectFormValues): DeployParams {
+  // Omitted rather than sent empty: exactOptionalPropertyTypes and the zod
+  // schema both treat these as "absent means use the built-in default".
+  const sni = {
+    ...(values.realitySni.trim() ? { realitySni: values.realitySni.trim() } : {}),
+    ...(values.hysteriaSni.trim() ? { hysteriaSni: values.hysteriaSni.trim() } : {}),
+  };
+
+  const domain = values.domainOverride ? values.domain.trim() : deriveAutoDomain(values.host);
+  if (!domain) return { distroHint: 'auto', tlsMode: 'self-signed', ...sni };
+
+  return {
+    distroHint: 'auto',
+    tlsMode: 'acme-domain',
+    domain,
+    acmeEmail: values.domainOverride ? values.acmeEmail.trim() : deriveAutoAcmeEmail(domain),
+    ...sni,
+  };
 }
 
 export function validateConnectForm(values: ConnectFormValues): ConnectFormErrors {
