@@ -26,6 +26,7 @@ export default function App() {
   const fatalError = useAppStore((state) => state.fatalError);
   const setFatalError = useAppStore((state) => state.setFatalError);
   const [manageOpen, setManageOpen] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   useEffect(
     () =>
@@ -54,8 +55,14 @@ export default function App() {
   // These channels reject on a stale/missing session, which leaves the user
   // on step 2 with nothing to explain why nothing happened. Route the error
   // into the app-wide modal instead of dropping it.
+  // install:start awaits a ProtocolDetector round-trip before it resolves, and
+  // this step only unmounts once the first progress event lands - so without
+  // this flag the button sits there looking idle and invites a second click.
+  // Main refuses to start a second run on the same session regardless; this
+  // is purely so the UI stops pretending nothing happened.
   const handleInstall = async (protocols: ProtocolId[]) => {
-    if (!checkResult || !deployParams) return;
+    if (!checkResult || !deployParams || starting) return;
+    setStarting(true);
     try {
       await window.uplink.installStart({
         sessionId: checkResult.sessionId,
@@ -65,6 +72,8 @@ export default function App() {
       });
     } catch (err) {
       setFatalError({ error: err as AppError, context: 'Starting installation' });
+    } finally {
+      setStarting(false);
     }
   };
 
@@ -138,6 +147,7 @@ export default function App() {
             onBack={handleBack}
             onManage={() => setManageOpen(true)}
             onInstall={(protocols) => void handleInstall(protocols)}
+            starting={starting}
           />
         )}
         {step === 3 && <InstallStep />}

@@ -13,6 +13,8 @@ export interface SelectStepProps {
   onBack: () => void;
   onManage: (protocol: ProtocolId) => void;
   onInstall: (protocols: ProtocolId[]) => void;
+  /** install:start is in flight - the step has not unmounted yet, so the button must not invite a second click. */
+  starting?: boolean;
 }
 
 const PROTOCOL_INDEX: Record<ProtocolId, string> = {
@@ -54,7 +56,7 @@ const CHECK_LABEL: Record<CheckId, string> = {
 
 const CHECK_GLYPH = { ok: '[+]', warn: '[~]', fail: '[!]' } as const;
 
-export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepProps) {
+export function SelectStep({ result, onBack, onManage, onInstall, starting }: SelectStepProps) {
   const picks = PlanBuilder.derivePicks(result.protocols);
   const [selected, setSelected] = useState<Set<ProtocolId>>(
     () => new Set(picks.filter((p) => !p.disabled).map((p) => p.protocol)),
@@ -198,10 +200,10 @@ export function SelectStep({ result, onBack, onManage, onInstall }: SelectStepPr
         </Button>
         <Button
           variant="primary"
-          disabled={!plan.canInstall || !result.preflight.passed}
+          disabled={!plan.canInstall || !result.preflight.passed || starting}
           onClick={() => onInstall(plan.installable)}
         >
-          Install
+          {starting ? 'Starting...' : 'Install'}
         </Button>
       </div>
     </>

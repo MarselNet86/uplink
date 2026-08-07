@@ -27,7 +27,7 @@ import { XrayRemover } from '../../domain/removers/XrayRemover';
 import { Pipeline } from '../../pipeline/Pipeline';
 import { ProgressReporter } from '../../pipeline/ProgressReporter';
 import type { Step } from '../../pipeline/Step';
-import { clearRun, createCancelToken } from '../../pipeline/runRegistry';
+import { claimSessionRun, clearRun, createCancelToken } from '../../pipeline/runRegistry';
 import {
   PROTOCOL_ORDER,
   RunTrackingSink,
@@ -110,11 +110,26 @@ export async function handleInstallStart(
     throwAppError('E_UNKNOWN', 'session not found, please check the server again');
   }
 
-  if (request.mode === 'install') {
-    await assertInstallable(session, request.protocols);
+  // Claimed before the assertInstallable round-trip below, not after: that
+  // await is exactly the window a second click slips through, since the
+  // renderer does not leave step 2 until the first progress event lands.
+  // A repeated click is the same request, so it gets the same RunHandle
+  // rather than an error or a second pipeline over one SSH session.
+  const runId = randomUUID();
+  const active = claimSessionRun(request.sessionId, runId);
+  if (active !== undefined) return { runId: active };
+
+  try {
+    if (request.mode === 'install') {
+      await assertInstallable(session, request.protocols);
+    }
+  } catch (err) {
+    // Nothing was started, so the claim has to go back - otherwise a rejected
+    // install would wedge the session until the user reconnects.
+    clearRun(runId);
+    throw err;
   }
 
-  const runId = randomUUID();
   const win = BrowserWindow.fromWebContents(event.sender);
   const cancelToken = createCancelToken(runId);
 

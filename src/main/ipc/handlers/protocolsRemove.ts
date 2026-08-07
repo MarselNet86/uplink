@@ -13,7 +13,7 @@ import { Hysteria2Remover } from '../../domain/removers/Hysteria2Remover';
 import { XrayRemover } from '../../domain/removers/XrayRemover';
 import { Pipeline } from '../../pipeline/Pipeline';
 import { ProgressReporter } from '../../pipeline/ProgressReporter';
-import { clearRun, createCancelToken } from '../../pipeline/runRegistry';
+import { claimSessionRun, clearRun, createCancelToken } from '../../pipeline/runRegistry';
 import {
   PROTOCOL_ORDER,
   RunTrackingSink,
@@ -43,7 +43,12 @@ export function handleProtocolsRemove(event: IpcMainInvokeEvent, payload: unknow
     throwAppError('E_UNKNOWN', 'session not found, please check the server again');
   }
 
+  // Same one-run-per-session rule as install:start - a double-clicked Remove
+  // gets the RunHandle already in flight instead of a second pipeline.
   const runId = randomUUID();
+  const active = claimSessionRun(request.sessionId, runId);
+  if (active !== undefined) return { runId: active };
+
   const win = BrowserWindow.fromWebContents(event.sender);
   const cancelToken = createCancelToken(runId);
 
