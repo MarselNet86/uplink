@@ -1,7 +1,21 @@
 node_modules/
 out/
 dist/
+.secrets.local
 .npm-cache/
 *.log
 .DS_Store
 *.tsbuildinfo
+coverage/
+
+# Agent tooling: worktrees, caches and generated plans. 884 MB on disk and
+# growing - untracked but not ignored until now, so any `git add -A` would
+# have tried to stage a whole second checkout, node_modules included.
+.claude/
+docs/superpowers/
+.scratch-*
+
+# Video sources. The README plays its demo from GitHub's user-attachments
+# CDN, which is the only host GitHub's CSP allows video from - a copy in the
+# repository is dead weight that only ever grows the history.
+*.mp4
