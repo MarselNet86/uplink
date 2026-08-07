@@ -14,4 +14,42 @@
 
 ---
 
-Deploy VLESS+Reality and Hysteria2 to your own VPS over SSH.
+<p align="center">
+  Desktop app that deploys your own VPN to your own VPS over SSH.<br>
+  No accounts, no telemetry — credentials and keys never leave your machine.
+</p>
+
+<div align="center">
+
+[![Telegram](https://img.shields.io/badge/Telegram-DaimonGRP-26A5E4?logo=telegram&logoColor=white)](https://t.me/DaimonGRP)
+[![macOS](https://img.shields.io/badge/macOS-Download-000000?logo=apple&logoColor=white)](https://github.com/MarselNet86/uplink/releases/latest)
+[![Windows](https://img.shields.io/badge/Windows-Download-0078D4?logo=windows&logoColor=white)](https://github.com/MarselNet86/uplink/releases/latest)
+[![Linux](https://img.shields.io/badge/Linux-Download-FCC624?logo=linux&logoColor=black)](https://github.com/MarselNet86/uplink/releases/latest)
+
+</div>
+
+<!--
+  Video: GitHub only renders a player for its own user-attachments CDN.
+  Drag docs/readme/uplink.mp4 into any issue or comment on this repository,
+  copy the https://github.com/user-attachments/assets/<uuid> link it produces,
+  and paste it below on a line of its own - no tags, no markdown.
+-->
+
+## Installation
+
+| Platform              | Download                                                                      |
+| :-------------------- | :---------------------------------------------------------------------------- |
+| macOS (Apple Silicon) | [`.dmg`](https://github.com/MarselNet86/uplink/releases/latest)               |
+| macOS (Intel)         | [`.dmg`](https://github.com/MarselNet86/uplink/releases/latest)               |
+| Windows               | [`Setup .exe`](https://github.com/MarselNet86/uplink/releases/latest)         |
+| Linux                 | [`.AppImage` / `.deb`](https://github.com/MarselNet86/uplink/releases/latest) |
+
+Builds are unsigned. macOS: right-click the app and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/Uplink.app`. Windows: **More info → Run anyway**. Verify downloads against `SHA256SUMS` published with each release.
+
+## Protocols
+
+Both install on port 443 at once and do not conflict — one takes TCP, the other UDP.
+
+**VLESS + Reality** — `443/tcp`. Xray-core. The server borrows the TLS handshake of a real third-party site, so traffic is indistinguishable from an ordinary HTTPS connection to that site. No domain and no certificate needed: the donor site is picked automatically from a built-in list and verified before install.
+
+**Hysteria2** — `443/udp`. QUIC-based, with congestion control that holds up on lossy and long-haul links where TCP collapses. Gets a real Let's Encrypt certificate on a free `sslip.io` domain derived from the server address, so no domain purchase is needed either.
